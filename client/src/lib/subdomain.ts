@@ -26,16 +26,27 @@ export function getSubdomain(): string | null {
     return null;
   }
   
-  // For production (tradyfi domain) - updated from besttrades
+  // For production (tradyfi domain)
   const parts = hostname.split('.');
   
-  // If it's just tradyfi.ng or www.tradyfi.ng, no subdomain
-  if ((parts.length === 3 && parts[0] === 'www')) {
+  // If it's just tradyfi.ng (2 parts) or www.tradyfi.ng (3 parts with www), no subdomain
+  if (parts.length === 2) {
+    // This is tradyfi.ng - main domain
     return null;
   }
   
-  // Return the first part as subdomain
-  return parts[0];
+  if (parts.length === 3 && parts[0] === 'www') {
+    // This is www.tradyfi.ng - main domain
+    return null;
+  }
+  
+  // If we have 3+ parts and first part is not 'www', it's a subdomain
+  if (parts.length >= 3) {
+    return parts[0];
+  }
+  
+  // Fallback
+  return null;
 }
 
 export function isMainDomain(): boolean {
