@@ -68,7 +68,8 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Fix the path to point to client/dist instead of server/public
+  const distPath = path.resolve(import.meta.dirname, "..", "client", "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
@@ -76,10 +77,17 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // Serve static files
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // SPA fallback - serve index.html for all non-API routes
+  app.get("*", (req, res, next) => {
+    // Skip API routes and service worker
+    if (req.path.startsWith("/api") || req.path.startsWith("/sw.js")) {
+      return next();
+    }
+    
+    // Serve React app for all other routes
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
