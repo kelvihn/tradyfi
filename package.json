@@ -1,5 +1,6 @@
 {
-  "name": "rest-express",
+  "name": "tradyfi",
+  "homepage": ".",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
