@@ -1109,58 +1109,270 @@ async function testEmailConnection() {
   }
 }
 
-  app.post('/api/auth/send-otp', async (req, res) => {
-    try {
-      const { email, type } = req.body; // type: 'user' or 'trader'
-      
-      if (!email || !type) {
-        return res.status(400).json({ message: "Email and type are required" });
-      }
-
-      // Generate 6-digit OTP
-      const otp = crypto.randomInt(100000, 999999).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Store OTP in database
-      await storage.createEmailVerification({
-        email,
-        otp,
-        expiresAt,
-        type,
-        verified: false
-      });
-
-      // Send OTP email
-      const mailOptions = {
-        from: process.env.FROM_EMAIL,
-        to: email,
-        subject: 'Email Verification - Tradyfi.ng',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Verify Your Email Address</h2>
-            <p>Thank you for registering with Tradyfi.ng!</p>
-            <p>Your verification code is:</p>
-            <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
-              <h1 style="color: #333; font-size: 32px; margin: 0; letter-spacing: 4px;">${otp}</h1>
-            </div>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you didn't request this verification, please ignore this email.</p>
-          </div>
-        `
-      };
-
-      await emailTransporter.sendMail(mailOptions);
-
-      res.json({ 
-        success: true, 
-        message: "OTP sent successfully",
-        email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3') // Masked email
-      });
-    } catch (error) {
-      console.error("Error sending OTP:", error);
-      res.status(500).json({ message: "Failed to send OTP" });
+// Updated OTP sending endpoint in routes.ts
+app.post('/api/auth/send-otp', async (req, res) => {
+  try {
+    const { email, type, purpose = 'registration' } = req.body; // purpose: 'registration' or 'password_reset'
+    
+    if (!email || !type) {
+      return res.status(400).json({ message: "Email and type are required" });
     }
-  });
+
+    console.log(`OTP request: email=${email}, type=${type}, purpose=${purpose}`);
+
+    // Check if email exists
+    const emailCheck = await storage.checkEmailExists(email);
+    
+    if (purpose === 'registration') {
+      // For registration, email should NOT exist
+      if (emailCheck.exists) {
+        return res.status(400).json({ 
+          message: "An account with this email already exists. Please use a different email or try logging in." 
+        });
+      }
+    } else if (purpose === 'password_reset') {
+      // For password reset, email MUST exist
+      if (!emailCheck.exists) {
+        return res.status(404).json({ 
+          message: "No account found with this email address." 
+        });
+      }
+      
+      // Ensure the user type matches what they're trying to reset
+      if (emailCheck.userType !== type) {
+        return res.status(400).json({ 
+          message: `This email is registered as a ${emailCheck.userType}, not a ${type}.` 
+        });
+      }
+    }
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP in database
+    await storage.createEmailVerification({
+      email,
+      otp,
+      expiresAt,
+      type,
+      verified: false
+    });
+
+    // Send OTP email with appropriate content
+    const isPasswordReset = purpose === 'password_reset';
+    const mailOptions = {
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: isPasswordReset ? 'Password Reset - Tradyfi.ng' : 'Email Verification - Tradyfi.ng',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>${isPasswordReset ? 'Reset Your Password' : 'Verify Your Email Address'}</h2>
+          <p>${isPasswordReset ? 
+            'You requested to reset your password for your Tradyfi.ng account.' : 
+            'Thank you for registering with Tradyfi.ng!'
+          }</p>
+          <p>Your ${isPasswordReset ? 'password reset' : 'verification'} code is:</p>
+          <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #333; font-size: 32px; margin: 0; letter-spacing: 4px;">${otp}</h1>
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't request this ${isPasswordReset ? 'password reset' : 'verification'}, please ignore this email.</p>
+        </div>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+
+    res.json({ 
+      success: true, 
+      message: `${isPasswordReset ? 'Password reset' : 'Verification'} code sent successfully`,
+      email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3') // Masked email
+    });
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+});
+
+
+// Add these password reset endpoints to your routes.ts
+
+// Send password reset OTP
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email, type } = req.body; // type: 'user' or 'trader'
+    
+    if (!email || !type) {
+      return res.status(400).json({ message: "Email and user type are required" });
+    }
+
+    // Check if email exists
+    const emailCheck = await storage.checkEmailExists(email);
+    
+    if (!emailCheck.exists) {
+      return res.status(404).json({ 
+        message: "No account found with this email address." 
+      });
+    }
+    
+    // Ensure the user type matches
+    if (emailCheck.userType !== type) {
+      return res.status(400).json({ 
+        message: `This email is registered as a ${emailCheck.userType}, not a ${type}.` 
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP in database
+    await storage.createEmailVerification({
+      email,
+      otp,
+      expiresAt,
+      type,
+      verified: false
+    });
+
+    // Send password reset email
+    const mailOptions = {
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: 'Password Reset - Tradyfi.ng',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Reset Your Password</h2>
+          <p>You requested to reset your password for your Tradyfi.ng account.</p>
+          <p>Your password reset code is:</p>
+          <div style="background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #333; font-size: 32px; margin: 0; letter-spacing: 4px;">${otp}</h1>
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't request this password reset, please ignore this email.</p>
+        </div>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+
+    res.json({ 
+      success: true, 
+      message: "Password reset code sent successfully",
+      email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3') // Masked email
+    });
+  } catch (error) {
+    console.error("Error sending password reset OTP:", error);
+    res.status(500).json({ message: "Failed to send password reset code" });
+  }
+});
+
+// Verify password reset OTP
+app.post('/api/auth/verify-reset-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    // Get verification record
+    const verification = await storage.getEmailVerification(email);
+    
+    if (!verification) {
+      return res.status(400).json({ message: "No verification found for this email" });
+    }
+
+    if (verification.verified) {
+      return res.status(400).json({ message: "This verification code has already been used" });
+    }
+
+    if (new Date() > verification.expiresAt) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    if (verification.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // Mark as verified but don't delete - we'll need it for password reset
+    await storage.updateEmailVerification(email, { verified: true });
+
+    res.json({ 
+      success: true, 
+      message: "OTP verified successfully. You can now reset your password.",
+      resetToken: Buffer.from(`${email}:${otp}:${Date.now()}`).toString('base64') // Simple reset token
+    });
+  } catch (error) {
+    console.error("Error verifying reset OTP:", error);
+    res.status(500).json({ message: "Failed to verify OTP" });
+  }
+});
+
+// Reset password with new password
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { resetToken, newPassword, confirmPassword } = req.body;
+    
+    if (!resetToken || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
+    }
+
+    // Decode reset token
+    let email, otp, timestamp;
+    try {
+      const decoded = Buffer.from(resetToken, 'base64').toString();
+      [email, otp, timestamp] = decoded.split(':');
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid reset token" });
+    }
+
+    // Check if token is not too old (30 minutes)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    if (tokenAge > 30 * 60 * 1000) {
+      return res.status(400).json({ message: "Reset token has expired" });
+    }
+
+    // Verify the OTP was verified
+    const verification = await storage.getEmailVerification(email);
+    
+    if (!verification || !verification.verified || verification.otp !== otp) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    // Get user by email
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update user password
+    await storage.updateUserPassword(user.id, hashedPassword);
+
+    // Clean up verification record
+    await storage.updateEmailVerification(email, { verified: false });
+
+    res.json({ 
+      success: true, 
+      message: "Password reset successfully. You can now log in with your new password." 
+    });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+});
 
   // Verify OTP and complete registration
 app.post('/api/auth/verify-otp', async (req, res) => {

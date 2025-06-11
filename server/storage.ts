@@ -34,6 +34,10 @@ import { eq, desc, and, count, sql, or, ne, exists } from "drizzle-orm";
 
 export interface IStorage {
 
+  getTraderByEmail(email: string): Promise<TraderWithUser | undefined>;
+  checkEmailExists(email: string): Promise<{ exists: boolean; userType: 'trader' | 'user' | null }>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<User>;
+
   createFCMToken(data: Omit<InsertFCMToken, 'id' | 'createdAt' | 'updatedAt'>): Promise<FCMToken>;
   getFCMTokenByToken(token: string): Promise<FCMToken | undefined>;
   getFCMTokensByUserId(userId: string): Promise<FCMToken[]>;
@@ -136,6 +140,67 @@ export class DatabaseStorage implements IStorage {
     })
     .returning();
   return token;
+}
+
+async getTraderByEmail(email: string): Promise<TraderWithUser | undefined> {
+  const [result] = await db
+    .select({
+      // Trader fields
+      id: traders.id,
+      userId: traders.userId,
+      businessName: traders.businessName,
+      contactInfo: traders.contactInfo,
+      documentType: traders.documentType,
+      documentUrl: traders.documentUrl,
+      documentPublicId: traders.documentPublicId,
+      subdomain: traders.subdomain,
+      emailVerified: traders.emailVerified,
+      status: traders.status,
+      profileDescription: traders.profileDescription,
+      createdAt: traders.createdAt,
+      updatedAt: traders.updatedAt,
+      // User fields
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(traders)
+    .innerJoin(users, eq(traders.userId, users.id))
+    .where(eq(users.email, email))
+    .limit(1);
+
+  return result as TraderWithUser | undefined;
+}
+
+// Check if any user exists with email (both regular users and traders)
+async checkEmailExists(email: string): Promise<{ exists: boolean; userType: 'trader' | 'user' | null }> {
+  const user = await this.getUserByEmail(email);
+  
+  if (!user) {
+    return { exists: false, userType: null };
+  }
+  
+  // Check if user is a trader
+  const trader = await this.getTraderByUserId(user.id);
+  
+  return { 
+    exists: true, 
+    userType: trader ? 'trader' : 'user' 
+  };
+}
+
+// Update user password (for password reset)
+async updateUserPassword(userId: string, hashedPassword: string): Promise<User> {
+  const [user] = await db
+    .update(users)
+    .set({ 
+      password: hashedPassword,
+      updatedAt: new Date() 
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  
+  return user;
 }
 
 async getFCMTokenByToken(token: string): Promise<FCMToken | undefined> {

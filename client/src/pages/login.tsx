@@ -235,6 +235,24 @@ export default function Login() {
                 )}
               />
 
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <Link href="/forgot-password" className="text-blue-600 hover:text-blue-500 font-medium">
+                    Forgot your password?
+                  </Link>
+                </div>
+              </div>
+
+         
+              {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('reset') === 'success' && (
+                <Alert className="mt-4 border-green-200 bg-green-50">
+                  <Shield className="h-4 w-4" />
+                  <AlertDescription className="text-green-800">
+                    Your password has been reset successfully! You can now sign in with your new password.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <Button 
                 type="submit" 
                 className="w-full" 

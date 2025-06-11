@@ -28,12 +28,16 @@ import NotFound from "@/pages/not-found";
 import PaymentSuccess from "@/pages/payment-success";
 import { useSubdomainValidator } from "./hooks/useSubdomainValidator";
 
+import ForgotPassword from "@/pages/forgot-password";
+import VerifyResetOTP from "@/pages/verify-reset-otp";
+import ResetPassword from "@/pages/reset-password";
+
 import { AuthProvider } from "@/hooks/useAuth";
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider> {/* Wrap with AuthProvider */}
+      <AuthProvider>
         <TooltipProvider>
           <Toaster />
           <Router />
@@ -43,13 +47,12 @@ function App() {
   );
 }
 
-
 function TraderRedirect() {
-  const { user, isLoading: authLoading } = useAuth(); // Get auth state
+  const { user, isLoading: authLoading } = useAuth();
   const { data: traderStatus, isLoading: traderLoading } = useQuery({
     queryKey: ["/api/trader/status"],
     retry: false,
-    enabled: !!user && !authLoading, // Only run when auth is complete
+    enabled: !!user && !authLoading,
   });
 
   console.log('🏠 TraderRedirect render');
@@ -58,26 +61,23 @@ function TraderRedirect() {
   console.log('⏳ Trader loading:', traderLoading);
   console.log('📊 Trader status:', traderStatus);
 
-  // Wait for both auth and trader status to load
   if (authLoading || traderLoading) {
     console.log('⏳ Still loading...');
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // Check if user is authenticated and has verified trader status
   if (user && traderStatus?.status === 'verified') {
     console.log('✅ Showing TraderDashboard');
     return <TraderDashboard />;
   }
 
-  // Otherwise show home page
   console.log('🏠 Showing Home page');
   return <Home />;
 }
 
 function Router() {
   const subdomain = getSubdomain();
-  const { isAuthenticated, isLoading, user } = useAuth(); // Uses shared context
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [location] = useLocation();
   const { loading, valid } = useSubdomainValidator();
 
@@ -92,19 +92,22 @@ function Router() {
       return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
     }
     
-    // Fixed: Added missing return statement
     if (valid === false) {
       console.log("its checking for validity");
       return <Route path="/" component={Landing} />;
     }
 
-    // For trader subdomains, we don't need to check main domain authentication
-    // The UserPortal component should handle its own authentication state
     console.log("it broke here");
     return (
       <Switch>
         <Route path="/login" component={UserLogin} />
         <Route path="/register" component={UserRegister} />
+        
+        {/* Add password reset routes for subdomains */}
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/verify-reset-otp" component={VerifyResetOTP} />
+        <Route path="/reset-password" component={ResetPassword} />
+        
         <Route path="/chat/:roomId" component={() => <UserPortal subdomain={subdomain} />} />
         <Route path="/" component={() => <UserPortal subdomain={subdomain} />} />
         <Route component={NotFound} />
@@ -117,6 +120,12 @@ function Router() {
     return (
       <Switch>
         <Route path="/login" component={AdminLogin} />
+        
+        {/* Add password reset routes for admin subdomain */}
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/verify-reset-otp" component={VerifyResetOTP} />
+        <Route path="/reset-password" component={ResetPassword} />
+        
         <Route path="/" component={isAuthenticated ? AdminDashboard : AdminLogin} />
         <Route component={NotFound} />
       </Switch>
@@ -127,8 +136,6 @@ function Router() {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-
-
 
   return (
     <Switch>
@@ -143,9 +150,14 @@ function Router() {
           <Route path="/trader/register" component={TraderRegister} />
           <Route path="/trader/profile" component={TraderProfile} />
           <Route path="/trader/dashboard" component={TraderDashboard} />
+          
+          {/* Password reset routes available to authenticated users */}
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/verify-reset-otp" component={VerifyResetOTP} />
+          <Route path="/reset-password" component={ResetPassword} />
+          
           <Route path="/test-portal" component={TestTraderPortal} />
           <Route path="/payment-success" component={PaymentSuccess} />
-          {/* Removed subdomain routes from main domain - they're handled above */}
           <Route component={NotFound} />
         </>
       ) : (
@@ -153,8 +165,13 @@ function Router() {
           <Route path="/" component={Landing} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
+          
+          {/* Password reset routes available to non-authenticated users */}
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/verify-reset-otp" component={VerifyResetOTP} />
+          <Route path="/reset-password" component={ResetPassword} />
+          
           <Route path="/payment-success" component={PaymentSuccess} />
-          {/* Removed subdomain routes from main domain - they're handled above */}
           <Route component={NotFound} />
         </>
       )}
