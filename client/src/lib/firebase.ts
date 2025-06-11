@@ -3,13 +3,13 @@ import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, MessagePayload } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
+        apiKey: "AIzaSyDgx2tSSFytVldct36PLY-FjsUxNnggBRk",
+        authDomain: "tradyfi-notifications.firebaseapp.com",
+        projectId: "tradyfi-notifications",
+        storageBucket: "tradyfi-notifications.firebasestorage.app",
+        messagingSenderId: "1062736625197",
+        appId: "1:1062736625197:web:8eafe0d33f54d923ac82a4"
+    };;
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

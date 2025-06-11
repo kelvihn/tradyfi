@@ -10,27 +10,14 @@ let firebaseConfig = null;
 self.addEventListener('install', async (event) => {
   console.log('🔥 Firebase Service Worker installing...');
   
-  try {
-    // Fetch config from your server
-    const response = await fetch('/api/firebase-config');
-    if (response.ok) {
-      firebaseConfig = await response.json();
-      console.log('✅ Firebase config loaded from server');
-    } else {
-      throw new Error('Failed to fetch Firebase config');
-    }
-  } catch (error) {
-    console.error('❌ Failed to load Firebase config, using fallback:', error);
-    // Fallback config (replace with your actual values)
-    firebaseConfig = {
-        apiKey: process.env.VITE_FIREBASE_API_KEY,
-        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.VITE_FIREBASE_APP_ID
-        };
-  }
+   firebaseConfig = {
+        apiKey: "AIzaSyDgx2tSSFytVldct36PLY-FjsUxNnggBRk",
+        authDomain: "tradyfi-notifications.firebaseapp.com",
+        projectId: "tradyfi-notifications",
+        storageBucket: "tradyfi-notifications.firebasestorage.app",
+        messagingSenderId: "1062736625197",
+        appId: "1:1062736625197:web:8eafe0d33f54d923ac82a4"
+    };
   
   // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
