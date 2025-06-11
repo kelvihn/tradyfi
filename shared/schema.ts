@@ -40,6 +40,35 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export type UserPushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertUserPushSubscription = typeof pushSubscriptions.$inferInsert;
 
+// Add after your existing pushSubscriptions table
+export const fcmTokens = pgTable("fcm_tokens", {
+  id: varchar("id", { length: 191 }).primaryKey().notNull().$defaultFn(() => crypto.randomUUID()),
+  userId: varchar("user_id", { length: 191 }).notNull(),
+  userType: varchar("user_type", { length: 50 }).default("user").notNull(),
+  token: text("token").notNull().unique(),
+  deviceInfo: text("device_info"),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastUsed: timestamp("last_used").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type FCMToken = typeof fcmTokens.$inferSelect;
+export type InsertFCMToken = typeof fcmTokens.$inferInsert;
+
+export const fcmTokensRelations = relations(fcmTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [fcmTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertFCMTokenSchema = createInsertSchema(fcmTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Users table for basic authentication
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
@@ -141,13 +170,15 @@ export const userSubscriptions = pgTable("user_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Relations
+// MODIFY your existing usersRelations (don't create new one)
 export const usersRelations = relations(users, ({ many }) => ({
   traders: many(traders),
   portalUsers: many(portalUsers),
   chatRooms: many(chatRooms),
   chatMessages: many(chatMessages),
   subscriptions: many(userSubscriptions),
+  pushSubscriptions: many(pushSubscriptions), // existing
+  fcmTokens: many(fcmTokens), // ADD this line
 }));
 
 export const tradersRelations = relations(traders, ({ one, many }) => ({

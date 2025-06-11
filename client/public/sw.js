@@ -1,162 +1,118 @@
-// public/sw.js
-const CACHE_NAME = 'tradyfi-v1';
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// Install event
-self.addEventListener('install', function(event) {
-  console.log('Service Worker: Install event');
-  
-  // Force the waiting service worker to become the active service worker
-  self.skipWaiting();
+// Initialize Firebase in service worker
+// Replace these with your actual Firebase config values from Firebase Console
+firebase.initializeApp({
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 });
 
-// Activate event
-self.addEventListener('activate', function(event) {
-  console.log('Service Worker: Activate event');
-  
-  // Claim all clients immediately
-  event.waitUntil(self.clients.claim());
-});
+const messaging = firebase.messaging();
 
-// Push event
-self.addEventListener('push', function(event) {
-  console.log('Service Worker: Push event received');
-  
-  if (!event.data) {
-    console.log('Push event has no data');
-    return;
-  }
+console.log('🔥 Firebase Service Worker Initialized');
 
-  let data;
-  try {
-    data = event.data.json();
-    console.log('Push notification data:', data);
-  } catch (error) {
-    console.error('Failed to parse push data:', error);
-    // Fallback for text data
-    data = {
-      title: 'New Message',
-      body: event.data.text() || 'You have a new message',
-      icon: '/favicon.ico'
-    };
-  }
+// Handle background messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('🔥 Firebase background message received:', payload);
 
-  const options = {
-    body: data.body || 'You have a new message',
-    icon: data.icon || '/favicon.ico',
-    badge: data.badge || '/favicon.ico',
-    image: data.image,
-    data: {
-      url: data.url || '/',
-      roomId: data.roomId,
-      senderId: data.senderId,
-      timestamp: Date.now()
-    },
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
+  const notificationOptions = {
+    body: payload.notification?.body || payload.data?.body || 'You have a new message',
+    icon: payload.notification?.icon || payload.data?.icon || '/favicon.ico',
+    badge: '/favicon.ico',
+    tag: payload.data?.tag || 'default',
+    data: payload.data || {},
     actions: [
       {
         action: 'open',
-        title: 'Open Chat',
-        icon: '/favicon.ico'
+        title: 'Open Chat'
       },
       {
-        action: 'close',
+        action: 'close', 
         title: 'Dismiss'
       }
     ],
-    requireInteraction: false, // Changed to false for better UX
-    silent: false,
+    requireInteraction: true,
     vibrate: [200, 100, 200],
-    tag: data.tag || 'notification', // Prevents duplicate notifications
-    renotify: true // Show notification even if tag exists
+    silent: false
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Tradyfi.ng', options)
-  );
+  console.log('🔥 Showing Firebase notification:', notificationTitle);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Notification click event
-self.addEventListener('notificationclick', function(event) {
-  console.log('Service Worker: Notification clicked', event);
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('🔥 Firebase notification clicked:', event);
   
   event.notification.close();
-
-  const data = event.notification.data || {};
   
-  if (event.action === 'close') {
+  const action = event.action;
+  const data = event.notification.data;
+  
+  if (action === 'close') {
     return;
   }
-
-  // Determine the URL to open
-  let url = data.url || '/';
   
-  // If it's a chat notification, construct the proper chat URL
-  if (data.roomId) {
-    // Check if it's a trader dashboard or user chat
-    url = window.location.hostname.includes('localhost') || window.location.hostname === 'yourdomain.com'
-      ? `/trader/dashboard?tab=chats&room=${data.roomId}`
-      : `/chat/${data.roomId}`;
-  }
-
-  console.log('Opening URL:', url);
-
-  // Handle notification click
+  // Open or focus the app
   event.waitUntil(
-    clients.matchAll({ 
-      type: 'window', 
-      includeUncontrolled: true 
-    }).then(function(clientList) {
-      
-      // Try to focus existing window with the app
-      for (let client of clientList) {
-        if (client.url.includes(window.location.host) || client.url.includes('localhost')) {
-          console.log('Focusing existing client:', client.url);
-          
-          return client.focus().then(() => {
-            // Send message to client to navigate to chat
-            if (data.roomId) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Try to focus existing window
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin)) {
+            if (data.chatRoomId) {
+              // Send message to client to navigate
               client.postMessage({
                 type: 'NAVIGATE_TO_CHAT',
-                roomId: data.roomId,
-                url: url
+                chatRoomId: data.chatRoomId,
+                url: data.clickAction || '/'
               });
             }
-          });
+            return client.focus();
+          }
         }
-      }
-      
-      // Open new window if none found
-      console.log('Opening new window with URL:', url);
-      return clients.openWindow(url);
-    }).catch(error => {
-      console.error('Error handling notification click:', error);
-    })
+        
+        // Open new window
+        let url = self.location.origin;
+        if (data.chatRoomId) {
+          // Determine if this is trader or user portal
+          if (data.isTrader === 'true' || self.location.hostname === 'tradyfi.ng') {
+            url += `/trader/dashboard?tab=chats&room=${data.chatRoomId}`;
+          } else {
+            url += `/chat/${data.chatRoomId}`;
+          }
+        } else if (data.clickAction) {
+          url = data.clickAction;
+        }
+        
+        console.log('🔥 Opening Firebase notification URL:', url);
+        return clients.openWindow(url);
+      })
   );
 });
 
-// Listen for messages from clients
-self.addEventListener('message', function(event) {
-  console.log('Service Worker: Message received', event.data);
+// Add install and activate events for proper service worker lifecycle
+self.addEventListener('install', (event) => {
+  console.log('🔥 Firebase Service Worker installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('🔥 Firebase Service Worker activating...');
+  event.waitUntil(clients.claim());
+});
+
+// Message handler for client communication
+self.addEventListener('message', (event) => {
+  console.log('🔥 Firebase Service Worker message:', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-});
-
-// Handle push subscription change
-self.addEventListener('pushsubscriptionchange', function(event) {
-  console.log('Service Worker: Push subscription changed');
-  
-  event.waitUntil(
-    // Re-subscribe logic here if needed
-    console.log('Push subscription change handled')
-  );
-});
-
-// Error handling
-self.addEventListener('error', function(event) {
-  console.error('Service Worker error:', event.error);
-});
-
-self.addEventListener('unhandledrejection', function(event) {
-  console.error('Service Worker unhandled rejection:', event.reason);
 });

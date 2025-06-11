@@ -19,6 +19,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const pushModule = await import('./routes/push.js' as any);
   const pushRoutes = pushModule.default || pushModule;
 
+  const fcmModule = await import('./routes/fcm.js' as any);
+  const fcmRoutes = fcmModule.default || fcmModule;
+  
+  app.use('/api/fcm', fcmRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/push', pushRoutes);
 

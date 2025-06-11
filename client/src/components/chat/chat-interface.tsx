@@ -1,16 +1,16 @@
+// Updated chat-interface.tsx with Firebase FCM
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ArrowLeft, Send, Paperclip, Image, File, X, Bell, BellOff } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+// CHANGE: Import Firebase hook instead of VAPID
+import { useFirebaseMessaging } from "@/hooks/useFirebaseMessaging"; 
 import { getSubdomain } from "@/lib/subdomain";
 import { useToast } from "@/hooks/use-toast";
-import { NotificationSettings } from "@/components/NotificationSettings";
 
 interface Message {
   id: number;
@@ -33,8 +33,8 @@ interface Message {
 interface ChatInterfaceProps {
   roomId: number;
   userId: string;
-  tradingOption?: string; // Change to trading option instead of names
-  onBack?: () => void; // Add back button handler
+  tradingOption?: string;
+  onBack?: () => void;
 }
 
 export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }: ChatInterfaceProps) {
@@ -57,7 +57,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     if (onBack) {
       onBack();
     } else {
-      // Default navigation based on user type
       if (isTrader) {
         window.location.href = '/trader/dashboard';
       } else {
@@ -66,31 +65,39 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
-  // Push notifications hook
+  // CHANGE: Use Firebase messaging hook instead of VAPID
   const {
+    token: firebaseToken,
     isSupported: notificationsSupported,
-    permission: notificationPermission,
-    subscription: hasNotificationSubscription,
-    enableNotifications,
+    isLoading: notificationsLoading,
+    error: notificationError,
+    subscribeToNotifications,
     unsubscribe: disableNotifications
-  } = usePushNotifications({ userId, isTrader });
+  } = useFirebaseMessaging({ userId, isTrader });
 
-  // WebSocket handlers with notification support
+  // Check if user has enabled Firebase notifications
+  const hasNotificationSubscription = !!firebaseToken;
+
+  // WebSocket handlers with Firebase notification support
   const handleNewMessage = useCallback((message: Message) => {
     setMessages(prev => [...prev, message]);
     
-    // Show browser notification if tab is not focused and user has enabled notifications
-    if (document.hidden && hasNotificationSubscription && message.senderId !== userId) {
-      // Fallback notification for when push notifications might not work
-      if (Notification.permission === 'granted') {
-        new Notification(`New message from ${message.senderName}`, {
-          body: message.content.length > 100 ? message.content.substring(0, 100) + '...' : message.content,
-          icon: '/favicon.ico',
-          tag: `chat-${roomId}` // Prevents duplicate notifications
-        });
-      }
+    // Firebase handles background notifications automatically
+    // Show in-app notification only if tab is visible
+    if (!document.hidden && message.senderId !== userId) {
+      toast({
+        title: `New message from ${message.senderName}`,
+        description: message.content.length > 100 ? 
+          message.content.substring(0, 100) + '...' : 
+          message.content,
+        action: message.content.length > 100 ? (
+          <Button size="sm" variant="outline">
+            View
+          </Button>
+        ) : undefined,
+      });
     }
-  }, [userId, roomId, hasNotificationSubscription]);
+  }, [userId, toast]);
 
   const handleTypingStatus = useCallback((isUserTyping: boolean, senderId: string) => {
     if (senderId !== userId) {
@@ -106,43 +113,46 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     isTrader
   });
 
-  // Handle navigation from service worker
+  // Handle navigation from Firebase service worker
   useEffect(() => {
-    const handleNavigateToChat = (event: CustomEvent) => {
-      const { roomId: targetRoomId } = event.detail;
-      if (targetRoomId && targetRoomId !== roomId) {
-        // Navigate to the target chat room
-        window.location.href = isTrader 
-          ? `/trader/dashboard?tab=chats&room=${targetRoomId}`
-          : `/chat/${targetRoomId}`;
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NAVIGATE_TO_CHAT') {
+        const { chatRoomId } = event.data;
+        if (chatRoomId && chatRoomId !== roomId) {
+          window.location.href = isTrader 
+            ? `/trader/dashboard?tab=chats&room=${chatRoomId}`
+            : `/chat/${chatRoomId}`;
+        }
       }
     };
 
-    window.addEventListener('navigateToChat', handleNavigateToChat as EventListener);
-    return () => window.removeEventListener('navigateToChat', handleNavigateToChat as EventListener);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      };
+    }
   }, [roomId, isTrader]);
 
-  // Check and request notification permissions on mount
+  // Check and request Firebase notification permissions on mount
   useEffect(() => {
-    if (notificationsSupported && notificationPermission === 'default') {
-      // Show a subtle prompt to enable notifications
+    if (notificationsSupported && !hasNotificationSubscription && !notificationsLoading) {
+      // Show a subtle prompt to enable Firebase notifications
       const timer = setTimeout(() => {
-        if (!hasNotificationSubscription) {
-          toast({
-            title: "Enable Notifications",
-            description: "Get notified when you receive new messages, even when the tab is closed.",
-            action: (
-              <Button size="sm" onClick={handleEnableNotifications}>
-                Enable
-              </Button>
-            ),
-          });
-        }
-      }, 5000); // Show after 5 seconds
+        toast({
+          title: "Enable Push Notifications",
+          description: "Get reliable notifications powered by Firebase, even when the app is closed.",
+          action: (
+            <Button size="sm" onClick={handleEnableNotifications}>
+              Enable
+            </Button>
+          ),
+        });
+      }, 5000);
 
       return () => clearTimeout(timer);
     }
-  }, [notificationsSupported, notificationPermission, hasNotificationSubscription]);
+  }, [notificationsSupported, hasNotificationSubscription, notificationsLoading]);
 
   const getToken = () => {
     if (isTrader) {
@@ -152,38 +162,38 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
-  // Handle enabling notifications
+  // Handle enabling Firebase notifications
   const handleEnableNotifications = async () => {
     try {
-      const success = await enableNotifications();
+      const success = await subscribeToNotifications();
       if (success) {
         toast({
-          title: "Notifications Enabled",
-          description: "You'll receive push notifications for new messages.",
+          title: "🔥 Firebase Notifications Enabled",
+          description: "You'll receive reliable push notifications powered by Firebase.",
         });
       } else {
         toast({
           title: "Failed to Enable Notifications",
-          description: "Please check your browser settings and try again.",
+          description: notificationError || "Please check your browser settings and try again.",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to enable notifications.",
+        description: "Failed to enable Firebase notifications.",
         variant: "destructive"
       });
     }
   };
 
-  // Handle disabling notifications
+  // Handle disabling Firebase notifications
   const handleDisableNotifications = async () => {
     try {
       await disableNotifications();
       toast({
         title: "Notifications Disabled",
-        description: "You'll no longer receive push notifications.",
+        description: "You'll no longer receive Firebase push notifications.",
       });
     } catch (error) {
       toast({
@@ -194,12 +204,14 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
+  // ... rest of your existing methods remain the same ...
+  // (loadMessages, scrollToBottom, sendMessage, etc.)
+
   useEffect(() => {
     const loadMessages = async () => {
       try {
         const token = getToken();
         console.log('Loading messages for room:', roomId);
-        console.log('Using token:', !!token);
         
         if (!token) {
           console.error('No token available for loading messages');
@@ -212,8 +224,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
             'Content-Type': 'application/json'
           }
         });
-        
-        console.log('Load messages response status:', response.status);
         
         if (response.ok) {
           const chatMessages = await response.json();
@@ -229,8 +239,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
           });
         } else {
           console.error('Failed to load messages:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('Error response:', errorText);
         }
       } catch (error) {
         console.error('Error loading messages:', error);
@@ -283,9 +291,7 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     try {
       let uploadedAttachments: any[] = [];
       if (filesToUpload.length > 0) {
-        console.log('Uploading files...');
         uploadedAttachments = await uploadFiles(filesToUpload);
-        console.log('Files uploaded:', uploadedAttachments);
       }
 
       const token = getToken();
@@ -333,13 +339,10 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
               : msg
           )
         );
-        
-        console.error('Failed to save message:', response.status, response.statusText);
       }
       
     } catch (error) {
       console.error('Error sending message:', error);
-      
       setMessages(prev => 
         prev.map(msg => 
           msg.id === tempId 
@@ -356,29 +359,8 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
-  // Image modal component
-  const ImageModal = ({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) => (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div className="relative max-w-4xl max-h-4xl p-4">
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 text-white text-2xl font-bold z-10 bg-black bg-opacity-50 rounded-full w-8 h-8 flex items-center justify-center"
-        >
-          ×
-        </button>
-        <img 
-          src={imageUrl} 
-          alt="Full size" 
-          className="max-w-full max-h-full object-contain"
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
-    </div>
-  );
-
+  // ... rest of your existing methods (renderAttachments, handleInputChange, etc.) ...
+  
   const renderAttachments = (attachments: Message['attachments']) => {
     if (!attachments || attachments.length === 0) return null;
 
@@ -510,9 +492,7 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Upload response:', result);
         setIsUploading(false);
-        
         return result.files || [];
       } else {
         throw new Error('File upload failed');
@@ -524,6 +504,28 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
+  const ImageModal = ({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) => (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div className="relative max-w-4xl max-h-4xl p-4">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-white text-2xl font-bold z-10 bg-black bg-opacity-50 rounded-full w-8 h-8 flex items-center justify-center"
+        >
+          ×
+        </button>
+        <img 
+          src={imageUrl} 
+          alt="Full size" 
+          className="max-w-full max-h-full object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-screen bg-slate-50">
       {/* Fixed Chat Header */}
@@ -531,7 +533,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
         <CardHeader className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              {/* Back Button */}
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -559,18 +560,18 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {/* Settings Dialog */}
-             
-              
-              {/* Quick notification toggle button */}
+              {/* Firebase notification toggle button */}
               {notificationsSupported && (
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={hasNotificationSubscription ? handleDisableNotifications : handleEnableNotifications}
-                  title={hasNotificationSubscription ? "Disable notifications" : "Enable notifications"}
+                  disabled={notificationsLoading}
+                  title={hasNotificationSubscription ? "Disable Firebase notifications" : "Enable Firebase notifications"}
                 >
-                  {hasNotificationSubscription ? (
+                  {notificationsLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  ) : hasNotificationSubscription ? (
                     <Bell className="h-4 w-4 text-green-600" />
                   ) : (
                     <BellOff className="h-4 w-4" />
@@ -582,7 +583,7 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
         </CardHeader>
       </Card>
 
-      {/* Messages Area - Flexible height */}
+      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.map((message) => (
           <div
@@ -710,9 +711,9 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-slate-500">
               {isConnected ? 'Connected' : 'Reconnecting...'}
-              {/* Notification status indicator */}
+              {/* Firebase notification status indicator */}
               {hasNotificationSubscription && (
-                <span className="ml-2 text-green-600">• Notifications ON</span>
+                <span className="ml-2 text-green-600">• 🔥 Firebase ON</span>
               )}
             </span>
             <span className="text-xs text-slate-500">

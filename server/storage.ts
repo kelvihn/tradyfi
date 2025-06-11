@@ -25,11 +25,22 @@ import {
   InsertUserPushSubscription,
   UserPushSubscription,
   pushSubscriptions,
+  fcmTokens,
+  FCMToken,
+  InsertFCMToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count, sql, or, ne, exists } from "drizzle-orm";
 
 export interface IStorage {
+
+  createFCMToken(data: Omit<InsertFCMToken, 'id' | 'createdAt' | 'updatedAt'>): Promise<FCMToken>;
+  getFCMTokenByToken(token: string): Promise<FCMToken | undefined>;
+  getFCMTokensByUserId(userId: string): Promise<FCMToken[]>;
+  updateFCMToken(id: string, updates: Partial<InsertFCMToken>): Promise<FCMToken>;
+  removeFCMToken(token: string): Promise<void>;
+  removeFCMTokenByUserAndToken(userId: string, token: string): Promise<void>;
+  cleanupInvalidFCMTokens(): Promise<number>;
   // User operations (for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -108,6 +119,73 @@ export interface EmailVerification {
 }
 
 export class DatabaseStorage implements IStorage {
+
+  async createFCMToken(data: Omit<InsertFCMToken, 'id' | 'createdAt' | 'updatedAt'>): Promise<FCMToken> {
+  const [token] = await db.insert(fcmTokens)
+    .values({
+      ...data,
+      id: crypto.randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning();
+  return token;
+}
+
+async getFCMTokenByToken(token: string): Promise<FCMToken | undefined> {
+  const [fcmToken] = await db.select()
+    .from(fcmTokens)
+    .where(eq(fcmTokens.token, token))
+    .limit(1);
+  return fcmToken;
+}
+
+async getFCMTokensByUserId(userId: string): Promise<FCMToken[]> {
+  return await db.select()
+    .from(fcmTokens)
+    .where(and(
+      eq(fcmTokens.userId, userId), 
+      eq(fcmTokens.isActive, true)
+    ))
+    .orderBy(desc(fcmTokens.lastUsed));
+}
+
+async updateFCMToken(id: string, updates: Partial<InsertFCMToken>): Promise<FCMToken> {
+  const [token] = await db.update(fcmTokens)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(fcmTokens.id, id))
+    .returning();
+  return token;
+}
+
+async removeFCMToken(token: string): Promise<void> {
+  await db.delete(fcmTokens)
+    .where(eq(fcmTokens.token, token));
+}
+
+async removeFCMTokenByUserAndToken(userId: string, token: string): Promise<void> {
+  await db.delete(fcmTokens)
+    .where(and(
+      eq(fcmTokens.userId, userId),
+      eq(fcmTokens.token, token)
+    ));
+}
+
+async cleanupInvalidFCMTokens(): Promise<number> {
+  // Remove tokens that haven't been used in 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const result = await db.delete(fcmTokens)
+    .where(or(
+      eq(fcmTokens.isActive, false),
+      sql`${fcmTokens.lastUsed} < ${thirtyDaysAgo}`
+    ));
+  
+  // Get count of deleted rows (this depends on your DB driver)
+  // For most SQL drivers, result.rowCount or result.affectedRows
+  return result.rowCount || 0;
+}
 
   async createPushSubscription(data: Omit<InsertUserPushSubscription, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserPushSubscription> {
   const [subscription] = await db.insert(pushSubscriptions)
