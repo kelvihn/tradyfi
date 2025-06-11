@@ -212,10 +212,10 @@ export default function Landing() {
             <Card className="p-6 hover:shadow-md transition-shadow">
               <CardContent className="p-0">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <ChartLine className="text-green-500 text-xl" />
+                  <MessageCircle className="text-green-500 text-xl" />
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">Admin Dashboard</h3>
-                <p className="text-slate-600">Comprehensive admin panel for managing traders, monitoring activity, and maintaining platform security.</p>
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">Connect to WhatsApp</h3>
+                <p className="text-slate-600">Link your domain to WhatsApp Business and seamlessly redirect users to your WhatsApp chat for instant support and communication.</p>
               </CardContent>
             </Card>
 

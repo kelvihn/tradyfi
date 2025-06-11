@@ -150,7 +150,7 @@ export function TraderPortalMain({ subdomain, mode, roomId }: TraderPortalMainPr
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-600">Email & Phone</p>
+                  <p className="text-sm font-medium text-slate-600">Phone</p>
                   <p className="text-slate-900">{trader?.contactInfo || 'Contact information not available'}</p>
                 </div>
               </CardContent>

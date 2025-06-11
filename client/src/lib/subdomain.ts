@@ -8,6 +8,7 @@ export function getSubdomain(): string | null {
     // Check for subdomain simulation via query parameter or localStorage
     const urlParams = new URLSearchParams(window.location.search);
     const subdomainParam = urlParams.get('subdomain');
+    
     if (subdomainParam) {
       localStorage.setItem('dev-subdomain', subdomainParam);
       return subdomainParam;
@@ -17,7 +18,7 @@ export function getSubdomain(): string | null {
     if (storedSubdomain) {
       return storedSubdomain;
     }
-    
+
     return null;
   }
   

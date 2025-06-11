@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { ArrowLeft, Building, Phone, CreditCard, FileText } from "lucide-react";
+import { ArrowLeft, Building, Phone, CreditCard, FileText, Upload } from "lucide-react";
 
 export default function TraderRegister() {
   const { user } = useAuth();
@@ -19,10 +19,12 @@ export default function TraderRegister() {
   const [formData, setFormData] = useState({
     businessName: '',
     contactInfo: '',
-    nin: '',
+    documentType: '',
+    documentFile: null as File | null,
     profileDescription: '',
     subdomain: ''
   });
+
   const [subdomainStatus, setSubdomainStatus] = useState<{
     checking: boolean;
     available: boolean | null;
@@ -32,6 +34,8 @@ export default function TraderRegister() {
     available: null,
     message: ""
   });
+
+  const [uploadingDocument, setUploadingDocument] = useState(false);
 
   // Get existing trader data to pre-fill form
   const { data: trader, isLoading } = useQuery({
@@ -65,8 +69,51 @@ export default function TraderRegister() {
     }
   };
 
+  // Handle file upload to Cloudinary
+  const handleFileUpload = async (file: File) => {
+    if (!file) return null;
+    
+    setUploadingDocument(true);
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+      
+      // Get auth token for the request
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await fetch('/api/chat/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const data = await response.json();
+      
+      if (data.files && data.files.length > 0) {
+        const uploadedFile = data.files[0];
+        return {
+          url: uploadedFile.url,
+          publicId: uploadedFile.public_id
+        };
+      } else {
+        throw new Error('No file uploaded');
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw new Error('Failed to upload document');
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
   const mutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: any) => {
       return await apiRequest("POST", "/api/trader/register", data);
     },
     onSuccess: () => {
@@ -87,13 +134,13 @@ export default function TraderRegister() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.businessName || !formData.contactInfo || !formData.nin || !formData.subdomain) {
+    if (!formData.businessName || !formData.contactInfo || !formData.documentType || !formData.documentFile || !formData.subdomain) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields including subdomain.",
+        description: "Please fill in all required fields including document upload.",
         variant: "destructive",
       });
       return;
@@ -108,16 +155,85 @@ export default function TraderRegister() {
       return;
     }
 
-    mutation.mutate(formData);
+    try {
+      // Upload document first
+      const documentData = await handleFileUpload(formData.documentFile);
+      
+      if (!documentData) {
+        throw new Error('Failed to upload document');
+      }
+      
+      // Then submit form with document URL
+      const submitData = {
+        businessName: formData.businessName,
+        contactInfo: formData.contactInfo,
+        documentType: formData.documentType,
+        documentUrl: documentData.url,
+        documentPublicId: documentData.publicId,
+        profileDescription: formData.profileDescription,
+        subdomain: formData.subdomain
+      };
+      
+      mutation.mutate(submitData);
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload document. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleInputChange = (field: keyof typeof formData) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  const handleInputChange = (field: keyof Omit<typeof formData, 'documentFile'>) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setFormData(prev => ({
       ...prev,
       [field]: e.target.value
     }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "Please select a file smaller than 10MB.",
+          variant: "destructive",
+        });
+        e.target.value = '';
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select a valid image (JPG, PNG, GIF, WEBP) or PDF file.",
+          variant: "destructive",
+        });
+        e.target.value = '';
+        return;
+      }
+
+      setFormData(prev => ({ ...prev, documentFile: file }));
+    }
+  };
+
+  const getDocumentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'national_id':
+        return 'National ID Card';
+      case 'drivers_license':
+        return "Driver's License";
+      case 'international_passport':
+        return 'International Passport';
+      default:
+        return 'selected document';
+    }
   };
 
   if (isLoading) {
@@ -180,35 +296,74 @@ export default function TraderRegister() {
               <div className="space-y-2">
                 <Label htmlFor="contactInfo" className="flex items-center">
                   <Phone className="h-4 w-4 mr-2" />
-                  Contact Information *
+                  Contact Information (Whatsapp number)*
                 </Label>
                 <Input
                   id="contactInfo"
-                  type="text"
-                  placeholder="Phone number or primary contact method"
+                  type="tel"
+                  placeholder="Phone number"
                   value={formData.contactInfo}
                   onChange={handleInputChange('contactInfo')}
+                  onInput={(e: any) => {
+                    // Remove any non-digit characters and limit to 11 digits
+                    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 11);
+                  }}
+                  maxLength={11}
+                  pattern="[0-9]{11}"
                   required
                 />
               </div>
 
+              {/* Document Type Selection */}
               <div className="space-y-2">
-                <Label htmlFor="nin" className="flex items-center">
+                <Label htmlFor="documentType" className="flex items-center">
                   <CreditCard className="h-4 w-4 mr-2" />
-                  National Identification Number (NIN) *
+                  Document Type *
+                </Label>
+                <select
+                  id="documentType"
+                  value={formData.documentType}
+                  onChange={handleInputChange('documentType')}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-transparent bg-white"
+                  required
+                >
+                  <option value="">Select document type</option>
+                  <option value="national_id">National ID Card</option>
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="international_passport">International Passport</option>
+                </select>
+                <p className="text-sm text-slate-500">
+                  Select the type of government-issued document you're uploading.
+                </p>
+              </div>
+
+              {/* Document Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="documentFile" className="flex items-center">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document *
                 </Label>
                 <Input
-                  id="nin"
-                  type="text"
-                  placeholder="Enter your 11-digit NIN"
-                  value={formData.nin}
-                  onChange={handleInputChange('nin')}
-                  maxLength={11}
+                  id="documentFile"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleFileChange}
+                  className="file:mr-4 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
                   required
                 />
                 <p className="text-sm text-slate-500">
-                  Your NIN is required for identity verification and compliance.
+                  Upload a clear photo or scan of your {getDocumentTypeLabel(formData.documentType)}. 
+                  Accepted formats: JPG, PNG, GIF, WEBP, PDF. Max size: 10MB.
                 </p>
+                {formData.documentFile && (
+                  <div className="flex items-center space-x-2 text-sm text-green-600">
+                    <FileText className="h-4 w-4" />
+                    <span>{formData.documentFile.name}</span>
+                    <span className="text-xs text-gray-500">
+                      ({(formData.documentFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -274,9 +429,11 @@ export default function TraderRegister() {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || uploadingDocument}
                 >
-                  {mutation.isPending ? "Submitting..." : "Submit for Verification"}
+                  {uploadingDocument ? "Uploading Document..." : 
+                   mutation.isPending ? "Submitting..." : 
+                   "Submit for Verification"}
                 </Button>
               </div>
 
@@ -284,7 +441,7 @@ export default function TraderRegister() {
                 <h4 className="font-medium text-blue-900 mb-2">What happens next?</h4>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• Your information will be reviewed by our verification team</li>
-                  <li>• We'll verify your NIN and business details</li>
+                  <li>• We'll verify your document and business details</li>
                   <li>• Once approved, you'll get your personalized trading portal</li>
                   <li>• Verification typically takes 1-3 business days</li>
                 </ul>

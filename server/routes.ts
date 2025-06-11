@@ -427,61 +427,77 @@ app.get('/api/trader/check-domain-validity/:domain', async (req, res) => {
   });
 
   // Trader verification (update existing trader with business details)
-  app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const { businessName, contactInfo, nin, profileDescription, subdomain } = req.body;
+// Updated registration route in routes.ts
+app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { 
+      businessName, 
+      contactInfo, 
+      documentType, 
+      documentUrl, 
+      documentPublicId, 
+      profileDescription, 
+      subdomain 
+    } = req.body;
 
-      // Validate required fields
-      if (!businessName || !contactInfo || !nin || !subdomain) {
-        return res.status(400).json({ message: "Business name, contact info, NIN, and subdomain are required" });
-      }
-
-      // Validate subdomain format
-      const subdomainRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-      if (!subdomainRegex.test(subdomain) || subdomain.length < 3 || subdomain.length > 30) {
-        return res.status(400).json({ message: "Invalid subdomain format" });
-      }
-
-      // Check if subdomain is available
-      const existingSubdomain = await storage.getTraderBySubdomain(subdomain);
-      if (existingSubdomain) {
-        return res.status(400).json({ message: "Subdomain is already taken" });
-      }
-
-      console.log("user id is @@", userId);
-
-      // Get existing trader profile
-      const existingTrader = await storage.getTraderByUserId(userId);
-
-      console.log("existing trader is @@", existingTrader);
-
-      if (!existingTrader) {
-        return res.status(404).json({ message: "Trader profile not found" });
-      }
-
-      // Check if NIN is already used by any trader
-      const existingNinTrader = await storage.getTraderByNin(nin);
-      if (existingNinTrader && existingNinTrader.id !== existingTrader.id) {
-        return res.status(400).json({ message: "NIN already in use" });
-      }
-
-      // Update trader profile with verification details
-      const trader = await storage.updateTrader(existingTrader.id, {
-        businessName,
-        contactInfo,
-        nin,
-        profileDescription: profileDescription || '',
-        subdomain,
-        status: 'verification_pending',
+    // Validate required fields
+    if (!businessName || !contactInfo || !documentType || !documentUrl || !subdomain) {
+      return res.status(400).json({ 
+        message: "Business name, contact info, document type, document upload, and subdomain are required" 
       });
-
-      res.status(201).json({ message: "Trader registration submitted for verification", trader });
-    } catch (error) {
-      console.error("Trader registration error:", error);
-      res.status(500).json({ message: "Trader registration failed" });
     }
-  });
+
+    // Validate document type
+    const validDocumentTypes = ['national_id', 'drivers_license', 'international_passport'];
+    if (!validDocumentTypes.includes(documentType)) {
+      return res.status(400).json({ message: "Invalid document type" });
+    }
+
+    // Validate subdomain format
+    const subdomainRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+    if (!subdomainRegex.test(subdomain) || subdomain.length < 3 || subdomain.length > 30) {
+      return res.status(400).json({ message: "Invalid subdomain format" });
+    }
+
+    // Check if subdomain is available
+    const existingSubdomain = await storage.getTraderBySubdomain(subdomain);
+    if (existingSubdomain) {
+      return res.status(400).json({ message: "Subdomain is already taken" });
+    }
+
+    console.log("user id is @@", userId);
+
+    // Get existing trader profile
+    const existingTrader = await storage.getTraderByUserId(userId);
+
+    console.log("existing trader is @@", existingTrader);
+
+    if (!existingTrader) {
+      return res.status(404).json({ message: "Trader profile not found" });
+    }
+
+    // Update trader profile with verification details
+    const trader = await storage.updateTrader(existingTrader.id, {
+      businessName,
+      contactInfo,
+      documentType,
+      documentUrl,
+      documentPublicId,
+      profileDescription: profileDescription || '',
+      subdomain,
+      status: 'verification_pending',
+    });
+
+    res.status(201).json({ 
+      message: "Trader registration submitted for verification", 
+      trader 
+    });
+  } catch (error) {
+    console.error("Trader registration error:", error);
+    res.status(500).json({ message: "Trader registration failed" });
+  }
+});
 
   // Admin-only routes
   app.get('/api/admin/traders', authenticate, async (req: AuthRequest, res) => {
@@ -1061,12 +1077,22 @@ app.get('/api/trader/subdomain/:subdomain', async (req, res) => {
 const emailTransporter = nodemailer.createTransport({
   host: 'smtp.sendgrid.net',
   port: 587,
-  secure: false, // false for STARTTLS
+  secure: false,
   auth: {
-    user: 'apikey', // This is literally the string "apikey"
-    pass: process.env.SMTP_PASS, // Your SendGrid API key
+    user: 'apikey',
+    pass: process.env.SMTP_PASS
   },
 });
+
+// const emailTransporter = nodemailer.createTransport({
+//   host: process.env.SMTP_HOST,
+//   port: process.env.SMTP_PORT,
+//   secure: true,
+//   auth: {
+//     user: process.env.SMTP_USER,
+//     pass: process.env.SMTP_PASS,
+//   },
+// });
 
 // Add this test function
 async function testEmailConnection() {

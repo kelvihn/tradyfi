@@ -53,7 +53,7 @@ export interface IStorage {
   getTraderByNin(nin: string): Promise<Trader | undefined>;
   updateTrader(id: number, updates: Partial<InsertTrader>): Promise<Trader>;
   getAllTraders(): Promise<Trader[]>;
-  getPendingTraders(): Promise<Trader[]>;
+  getPendingTraders(): Promise<(Trader & { email: string; firstName: string; lastName: string })[]>;
   
   // Portal user operations
   createPortalUser(portalUser: InsertPortalUser): Promise<PortalUser>;
@@ -117,6 +117,12 @@ export interface EmailVerification {
   verified: boolean;
   createdAt: Date;
 }
+
+export type TraderWithUser = Trader & {
+  email: string;
+  firstName: string;
+  lastName: string;
+};
 
 export class DatabaseStorage implements IStorage {
 
@@ -400,11 +406,20 @@ async createUserWithTraderLink(
   return user;
 }
 
+async getTraderByDocumentUrl(documentUrl: string): Promise<Trader | undefined> {
+  const [trader] = await db.select().from(traders).where(eq(traders.documentUrl, documentUrl));
+  return trader;
+}
+
   // Trader operations
-  async createTrader(trader: InsertTrader): Promise<Trader> {
-    const [newTrader] = await db.insert(traders).values(trader).returning();
-    return newTrader;
-  }
+async createTrader(trader: InsertTrader): Promise<Trader> {
+  const [newTrader] = await db.insert(traders).values({
+    ...trader,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }).returning();
+  return newTrader;
+}
 
   async getTrader(id: number): Promise<Trader | undefined> {
     const [trader] = await db.select().from(traders).where(eq(traders.id, id));
@@ -435,13 +450,66 @@ async createUserWithTraderLink(
     return trader;
   }
 
-  async getAllTraders(): Promise<Trader[]> {
-    return await db.select().from(traders).orderBy(desc(traders.createdAt));
-  }
+// Update the getPendingTraders method to include user data
+async getPendingTraders(): Promise<TraderWithUser[]> {
+  const result = await db
+    .select({
+      // Trader fields - include ALL trader fields
+      id: traders.id,
+      userId: traders.userId,
+      businessName: traders.businessName,
+      contactInfo: traders.contactInfo,
+      documentType: traders.documentType,
+      documentUrl: traders.documentUrl,
+      documentPublicId: traders.documentPublicId,
+      subdomain: traders.subdomain,
+      emailVerified: traders.emailVerified,
+      status: traders.status,
+      profileDescription: traders.profileDescription,
+      createdAt: traders.createdAt,
+      updatedAt: traders.updatedAt,
+      // User fields
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(traders)
+    .innerJoin(users, eq(traders.userId, users.id))
+    .where(eq(traders.status, "verification_pending"))
+    .orderBy(desc(traders.createdAt));
 
-  async getPendingTraders(): Promise<Trader[]> {
-    return await db.select().from(traders).where(eq(traders.status, "verification_pending")).orderBy(desc(traders.createdAt));
-  }
+  return result as TraderWithUser[];
+}
+
+// Update the getAllTraders method to include user data
+async getAllTraders(): Promise<TraderWithUser[]> {
+  const result = await db
+    .select({
+      // Trader fields - include ALL trader fields
+      id: traders.id,
+      userId: traders.userId,
+      businessName: traders.businessName,
+      contactInfo: traders.contactInfo,
+      documentType: traders.documentType,
+      documentUrl: traders.documentUrl,
+      documentPublicId: traders.documentPublicId,
+      subdomain: traders.subdomain,
+      emailVerified: traders.emailVerified,
+      status: traders.status,
+      profileDescription: traders.profileDescription,
+      createdAt: traders.createdAt,
+      updatedAt: traders.updatedAt,
+      // User fields
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(traders)
+    .innerJoin(users, eq(traders.userId, users.id))
+    .orderBy(desc(traders.createdAt));
+
+  return result as TraderWithUser[];
+}
 
   // Portal user operations
   async createPortalUser(portalUser: InsertPortalUser): Promise<PortalUser> {

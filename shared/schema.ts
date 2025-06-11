@@ -88,7 +88,10 @@ export const traders = pgTable("traders", {
   userId: varchar("user_id").notNull().references(() => users.id),
   businessName: text("business_name").notNull(),
   contactInfo: text("contact_info").notNull(),
-  nin: text("nin").notNull().unique(),
+  // Replace nin field with document fields
+  documentType: varchar("document_type", { enum: ["national_id", "drivers_license", "international_passport"] }),
+  documentUrl: text("document_url"), // Cloudinary URL
+  documentPublicId: text("document_public_id"), // For deletion from Cloudinary
   subdomain: text("subdomain").unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   status: varchar("status", { enum: ["unverified", "verification_pending", "verified", "suspended", "rejected"] }).default("unverified"),

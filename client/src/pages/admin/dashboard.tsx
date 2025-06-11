@@ -4,10 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { adminApiRequest, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+// Import the type from your shared schema
+import { TraderWithUser } from "@shared/schema";
 import { 
   Users, 
   UserCheck, 
@@ -22,19 +25,30 @@ import {
   DollarSign,
   TrendingUp,
   CreditCard,
-  Calendar
+  Calendar,
+  FileText,
+  Download,
+  ExternalLink
 } from "lucide-react";
 
 export default function AdminDashboard() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Document viewer state - now properly typed
+  const [documentDialog, setDocumentDialog] = useState<{
+    isOpen: boolean;
+    trader: TraderWithUser | null;
+  }>({
+    isOpen: false,
+    trader: null
+  });
 
   // Check if user is admin
   useEffect(() => {
     console.log('Admin check:', { authLoading, isAuthenticated, user });
     
-    // Wait for authentication to complete and user data to be available
     if (!authLoading && user) {
       if ((user as any).role !== 'admin') {
         toast({
@@ -45,7 +59,6 @@ export default function AdminDashboard() {
         setLocation("/admin/login");
       }
     } else if (!authLoading && !user && !localStorage.getItem('token')) {
-      // No token exists, redirect to login
       setLocation("/admin/login");
     }
   }, [authLoading, isAuthenticated, user, setLocation, toast]);
@@ -57,8 +70,8 @@ export default function AdminDashboard() {
     enabled: !!user && (user as any).role === 'admin',
   });
 
-  // Fetch pending traders
-  const { data: pendingTraders = [], isLoading: pendingLoading } = useQuery({
+  // Fetch pending traders - now properly typed
+  const { data: pendingTraders = [], isLoading: pendingLoading } = useQuery<TraderWithUser[]>({
     queryKey: ['/api/admin/traders/pending'],
     queryFn: () => adminApiRequest('GET', '/api/admin/traders/pending'),
     enabled: !!user && (user as any).role === 'admin',
@@ -71,8 +84,8 @@ export default function AdminDashboard() {
     enabled: !!user && (user as any).role === 'admin',
   });
 
-  // Fetch all traders
-  const { data: allTraders = [], isLoading: tradersLoading } = useQuery({
+  // Fetch all traders - now properly typed
+  const { data: allTraders = [], isLoading: tradersLoading } = useQuery<TraderWithUser[]>({
     queryKey: ['/api/admin/traders'],
     queryFn: () => adminApiRequest('GET', '/api/admin/traders'),
     enabled: !!user && (user as any).role === 'admin',
@@ -153,12 +166,7 @@ export default function AdminDashboard() {
     },
   });
 
-  if (authLoading || !user || (user as any).role !== 'admin') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  const isLoading = statsLoading || pendingLoading || tradersLoading;
-
+  // Helper functions
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'verified':
@@ -171,6 +179,188 @@ export default function AdminDashboard() {
         return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Unknown</Badge>;
     }
   };
+
+  const getDocumentTypeLabel = (documentType: string) => {
+    switch (documentType) {
+      case 'national_id':
+        return 'National ID Card';
+      case 'drivers_license':
+        return "Driver's License";
+      case 'international_passport':
+        return 'International Passport';
+      default:
+        return 'Government Document';
+    }
+  };
+
+  const handleViewDocument = (trader: TraderWithUser) => {
+    setDocumentDialog({
+      isOpen: true,
+      trader
+    });
+  };
+
+  const handleDownloadDocument = (documentUrl: string, traderName: string) => {
+    const link = document.createElement('a');
+    link.href = documentUrl;
+    link.download = `${traderName.replace(/\s+/g, '_')}_document`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const isImageFile = (url: string) => {
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  };
+
+  // Document viewer component - now properly typed
+  const DocumentViewer = ({ trader }: { trader: TraderWithUser }) => {
+    if (!trader?.documentUrl) {
+      return (
+        <div className="text-center py-8">
+          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No document uploaded</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold">{getDocumentTypeLabel(trader.documentType || '')}</h3>
+            <p className="text-sm text-gray-600">Uploaded by {trader.businessName}</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleDownloadDocument(trader.documentUrl!, trader.businessName)}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(trader.documentUrl!, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Open
+            </Button>
+          </div>
+        </div>
+        
+        <div className="border rounded-lg overflow-hidden bg-gray-50">
+          {isImageFile(trader.documentUrl) ? (
+            <img
+              src={trader.documentUrl}
+              alt={`${trader.businessName} ${getDocumentTypeLabel(trader.documentType || '')}`}
+              className="w-full h-auto max-h-96 object-contain"
+            />
+          ) : (
+            <div className="p-8 text-center">
+              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-4">
+                PDF Document - {getDocumentTypeLabel(trader.documentType || '')}
+              </p>
+              <Button onClick={() => window.open(trader.documentUrl!, '_blank')}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View PDF
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Trader card component with document viewing - now properly typed
+  const TraderCard = ({ trader, showActions = false }: { trader: TraderWithUser; showActions?: boolean }) => (
+    <div key={trader.id} className="border rounded-lg p-4 bg-white">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="font-semibold text-lg">{trader.businessName}</h3>
+            {getStatusBadge(trader.status)}
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+            <div>
+              <strong>Owner:</strong> {trader.firstName} {trader.lastName}
+            </div>
+            <div>
+              <strong>Email:</strong> {trader.email}
+            </div>
+            <div>
+              <strong>Contact:</strong> {trader.contactInfo}
+            </div>
+            <div>
+              <strong>Subdomain:</strong> {trader.subdomain}
+            </div>
+            {trader.documentType && (
+              <div>
+                <strong>Document:</strong> {getDocumentTypeLabel(trader.documentType)}
+              </div>
+            )}
+            <div>
+              <strong>Joined:</strong> {new Date(trader.createdAt!).toLocaleDateString()}
+            </div>
+          </div>
+          {trader.profileDescription && (
+            <div className="mt-2">
+              <strong className="text-sm">Description:</strong>
+              <p className="text-sm text-gray-600">{trader.profileDescription}</p>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 ml-4">
+          {/* Document view button */}
+          {trader.documentUrl && (
+            <Button
+              onClick={() => handleViewDocument(trader)}
+              variant="outline"
+              size="sm"
+              className="w-full"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View Document
+            </Button>
+          )}
+          
+          {/* Action buttons for pending traders */}
+          {showActions && trader.status === 'verification_pending' && (
+            <>
+              <Button
+                onClick={() => approveMutation.mutate(trader.id)}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Approve
+              </Button>
+              <Button
+                onClick={() => rejectMutation.mutate(trader.id)}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+                variant="destructive"
+                size="sm"
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                Reject
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (authLoading || !user || (user as any).role !== 'admin') {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  const isLoading = statsLoading || pendingLoading || tradersLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -279,57 +469,8 @@ export default function AdminDashboard() {
                   <div className="text-center py-8 text-gray-500">No pending approvals</div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingTraders.map((trader: any) => (
-                      <div key={trader.id} className="border rounded-lg p-4 bg-white">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-lg">{trader.businessName}</h3>
-                              {getStatusBadge(trader.status)}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                              <div>
-                                <strong>Owner:</strong> {trader.firstName} {trader.lastName}
-                              </div>
-                              <div>
-                                <strong>Email:</strong> {trader.email}
-                              </div>
-                              <div>
-                                <strong>Phone:</strong> {trader.phoneNumber}
-                              </div>
-                              <div>
-                                <strong>Subdomain:</strong> {trader.subdomain}
-                              </div>
-                            </div>
-                            {trader.profileDescription && (
-                              <div className="mt-2">
-                                <strong className="text-sm">Description:</strong>
-                                <p className="text-sm text-gray-600">{trader.profileDescription}</p>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2 ml-4">
-                            <Button
-                              onClick={() => approveMutation.mutate(trader.id)}
-                              disabled={approveMutation.isPending || rejectMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              size="sm"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              onClick={() => rejectMutation.mutate(trader.id)}
-                              disabled={approveMutation.isPending || rejectMutation.isPending}
-                              variant="destructive"
-                              size="sm"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+                    {pendingTraders.map((trader) => (
+                      <TraderCard key={trader.id} trader={trader} showActions={true} />
                     ))}
                   </div>
                 )}
@@ -353,62 +494,12 @@ export default function AdminDashboard() {
                   <div className="text-center py-8 text-gray-500">No traders registered</div>
                 ) : (
                   <div className="space-y-4">
-                    {allTraders.map((trader: any) => (
-                      <div key={trader.id} className="border rounded-lg p-4 bg-white">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-lg">{trader.businessName}</h3>
-                              {getStatusBadge(trader.status)}
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                              <div>
-                                <strong>Owner:</strong> {trader.firstName} {trader.lastName}
-                              </div>
-                              <div>
-                                <strong>Email:</strong> {trader.email}
-                              </div>
-                              <div>
-                                <strong>Phone:</strong> {trader.phoneNumber}
-                              </div>
-                              <div>
-                                <strong>Subdomain:</strong> {trader.subdomain}
-                              </div>
-                              <div>
-                                <strong>Joined:</strong> {new Date(trader.createdAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                            {trader.profileDescription && (
-                              <div className="mt-2">
-                                <strong className="text-sm">Description:</strong>
-                                <p className="text-sm text-gray-600">{trader.profileDescription}</p>
-                              </div>
-                            )}
-                          </div>
-                          {trader.status === 'verification_pending' && (
-                            <div className="flex gap-2 ml-4">
-                              <Button
-                                onClick={() => approveMutation.mutate(trader.id)}
-                                disabled={approveMutation.isPending || rejectMutation.isPending}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                                size="sm"
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Approve
-                              </Button>
-                              <Button
-                                onClick={() => rejectMutation.mutate(trader.id)}
-                                disabled={approveMutation.isPending || rejectMutation.isPending}
-                                variant="destructive"
-                                size="sm"
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    {allTraders.map((trader) => (
+                      <TraderCard 
+                        key={trader.id} 
+                        trader={trader} 
+                        showActions={trader.status === 'verification_pending'} 
+                      />
                     ))}
                   </div>
                 )}
@@ -416,7 +507,7 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Subscriptions & Revenue Tab */}
+          {/* Subscriptions & Revenue Tab - Keep existing content */}
           <TabsContent value="subscriptions" className="space-y-6">
             {/* Revenue Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -557,6 +648,19 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Document Viewer Dialog */}
+      <Dialog 
+        open={documentDialog.isOpen} 
+        onOpenChange={(open) => setDocumentDialog({ isOpen: open, trader: null })}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Document Verification</DialogTitle>
+          </DialogHeader>
+          {documentDialog.trader && <DocumentViewer trader={documentDialog.trader} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

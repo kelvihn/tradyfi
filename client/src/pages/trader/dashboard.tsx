@@ -355,12 +355,12 @@ export default function TraderDashboard() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="contactInfo">Contact Information</Label>
+                    <Label htmlFor="contactInfo">Contact Information (Whatsapp number)</Label>
                     <Input
                       id="contactInfo"
                       value={profileForm.contactInfo}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, contactInfo: e.target.value }))}
-                      placeholder="Phone number or email"
+                      placeholder="Phone number"
                     />
                   </div>
                   

@@ -151,6 +151,16 @@ const logoutMutation = useMutation({
     setSelectedService(service);
   };
 
+  const handleWhatsappClick = () => {
+    const message = "Hello! I'm interested in your trading services.";
+
+    const formattedNumber = trader?.contactInfo.replace(/\D/g, '');
+
+    const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handleStartChat = (tradingOption: string) => {
     console.log("Starting chat for trading option:", tradingOption);
     createChatMutation.mutate(tradingOption);
@@ -305,8 +315,8 @@ const logoutMutation = useMutation({
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleServiceClick("buy_crypto")}>
             <CardHeader>
-              <CardTitle className="flex items-center text-green-600">
-                <ShoppingCart className="h-6 w-6 mr-2" />
+              <CardTitle className="flex items-center text-teal-600">
+                <ShoppingCart className="text-teal-500 h-6 w-6 mr-2" />
                 Buy Crypto
               </CardTitle>
               <CardDescription>
@@ -364,6 +374,29 @@ const logoutMutation = useMutation({
                 <div>
                   <p className="text-sm text-slate-600">Quick Process</p>
                   <p className="text-lg font-semibold text-purple-600">Fair Value</p>
+                </div>
+                <Button variant="outline" size="sm">
+                  Start →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleWhatsappClick()}>
+            <CardHeader>
+              <CardTitle className="flex items-center text-green-600">
+                <MessageCircle className="text-green-500 h-6 w-6 mr-2" />
+                Chat on Whatsapp
+              </CardTitle>
+              <CardDescription>
+                Click here to chat with {trader?.businessName} directly on Whatsapp
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600">Active</p>
+                  <p className="text-lg font-semibold text-green-600">Chat Now</p>
                 </div>
                 <Button variant="outline" size="sm">
                   Start →

@@ -81,7 +81,7 @@ function Router() {
   const [location] = useLocation();
   const { loading, valid } = useSubdomainValidator();
 
-  console.log("🏠 ROUTER DEBUG (with context):");
+  console.log("🏠 ROUTER DEBUG (with context):", subdomain);
   console.log("- Is Authenticated:", isAuthenticated);
   console.log("- User:", user);
   console.log("=================");
