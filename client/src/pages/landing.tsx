@@ -15,10 +15,8 @@ export default function Landing() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                    <ChartLine className="text-white text-lg" />
-                  </div>
-                  <span className="ml-3 text-xl font-bold text-slate-900">Tradyfi.ng</span>
+                  <img className="text-white text-lg" src="/logo.png" />
+                  {/* <span className="ml-3 text-xl font-bold text-slate-900">Tradyfi.ng</span> */}
                 </div>
               </div>
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
@@ -28,7 +26,7 @@ export default function Landing() {
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <AuthModal 
+              {/* <AuthModal 
                 trigger={
                   <Button 
                     variant="ghost" 
@@ -38,7 +36,7 @@ export default function Landing() {
                   </Button>
                 }
                 defaultMode="login"
-              />
+              /> */}
               <Link href="/register">
                 <Button className="btn-primary">
                   Register as Trader
@@ -64,7 +62,7 @@ export default function Landing() {
                   Get your own personalized trading subdomain on Tradyfi.ng. 
                   Verified traders receive custom portals with secure client chat and professional tools.
                 </p>
-                <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                <div className="mt-8 flex flex-row flex-wrap gap-4">
                   <Link href="/register">
                     <Button 
                       size="lg"
@@ -73,13 +71,15 @@ export default function Landing() {
                       Register as Trader
                     </Button>
                   </Link>
+                  <Link href="/login">
                   <Button 
                     variant="outline" 
                     size="lg"
                     className="text-lg px-8 py-4"
                   >
-                    View Demo
+                    Login
                   </Button>
+                  </Link>
                 </div>
                 <div className="mt-8 flex items-center space-x-6 text-sm text-slate-500">
                   <div className="flex items-center">
@@ -254,13 +254,13 @@ export default function Landing() {
               }
               defaultMode="register"
             />
-            <Button 
+            {/* <Button 
               variant="outline" 
               size="lg"
               className="border-2 border-white hover:bg-white hover:text-primary text-white px-8 py-4 text-lg"
             >
               Schedule a Demo
-            </Button>
+            </Button> */}
           </div>
         </div>
       </section>
@@ -270,12 +270,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid md:grid-cols-4 gap-8">
             <div className="md:col-span-1">
-              <div className="flex items-center mb-4">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <ChartLine className="text-white" />
-                </div>
-                <span className="ml-3 text-xl font-bold">Tradyfi.ng</span>
-              </div>
+              <img className="text-white text-lg" src="/logo.png" />
               <p className="text-slate-400 mb-4">
                 Professional crypto trading platform connecting independent traders with users through personalized portals.
               </p>
@@ -311,7 +306,7 @@ export default function Landing() {
 
           <div className="border-t border-slate-800 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-slate-400 text-sm">
-              © 2024 Tradyfi.ng. All rights reserved.
+              © 2025 Tradyfi.ng. All rights reserved.
             </p>
             <div className="flex items-center space-x-6 mt-4 md:mt-0">
               <div className="flex items-center text-slate-400 text-sm">
