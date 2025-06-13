@@ -20,7 +20,6 @@ const emailTransporter = nodemailer.createTransport({
   },
 });
 
-// Add this export (keep your existing export statement too)
 export { emailTransporter };
 
 export async function registerRoutes(app: Express): Promise<Server> {
