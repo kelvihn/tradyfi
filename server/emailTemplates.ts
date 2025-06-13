@@ -74,13 +74,6 @@ export const emailTemplates = {
             </p>
           </div>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.FRONTEND_URL}/trader/register" 
-               style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 30px; border-radius: 6px; font-weight: 600; display: inline-block;">
-              Complete Verification
-            </a>
-          </div>
-
           <p style="color: #777777; line-height: 1.6; margin: 25px 0 0; font-size: 14px;">
             If you have any questions or need assistance, our support team is here to help. Simply reply to this email or contact us through your dashboard.
           </p>

@@ -551,10 +551,7 @@ app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => 
                     <td style="padding: 8px 0; font-weight: bold; color: #555;">Contact Info:</td>
                     <td style="padding: 8px 0; color: #333;">${contactInfo}</td>
                   </tr>
-                  <tr>
-                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Document Type:</td>
-                    <td style="padding: 8px 0; color: #333;">${documentTypeDisplayName[documentType]}</td>
-                  </tr>
+               
                 </table>
               </div>
 
@@ -600,21 +597,6 @@ app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => 
                   </div>
                 </div>
               ` : ''}
-
-              <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">Verification Document</h2>
-                <div style="background: #e8f4f8; padding: 15px; border-radius: 6px; border: 1px solid #bee5eb;">
-                  <p style="margin: 0 0 10px 0; color: #0c5460;">
-                    <strong>Document Type:</strong> ${documentTypeDisplayName[documentType]}
-                  </p>
-                  <p style="margin: 0; color: #0c5460;">
-                    <strong>Document URL:</strong> 
-                    <a href="${documentUrl}" target="_blank" style="color: #007bff; text-decoration: none; word-break: break-all;">
-                      View Document →
-                    </a>
-                  </p>
-                </div>
-              </div>
 
               <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                 <h3 style="color: #856404; margin: 0 0 10px 0;">⚠️ Action Required</h3>
