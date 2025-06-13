@@ -13,7 +13,7 @@ import { sendWelcomeEmail } from "./emailTemplates";
 const emailTransporter = nodemailer.createTransport({
   host: 'smtp.sendgrid.net',
   port: 587,
-  secure: false,
+  secure: true,
   auth: {
     user: 'apikey',
     pass: process.env.SMTP_PASS
