@@ -244,7 +244,7 @@ const { data: plans, isLoading: plansLoading } = useQuery({
                 <Button 
                   onClick={() => upgradeMutation.mutate(premiumPlan.id)}
                   disabled={upgradeMutation.isPending}
-                  className="w-full bg-green-600 hover:bg-green-700"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                 >
                   {upgradeMutation.isPending ? 'Processing...' : 'Upgrade Now'}
                 </Button>

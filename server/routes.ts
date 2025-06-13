@@ -10,6 +10,18 @@ import nodemailer from "nodemailer";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
 import { sendWelcomeEmail } from "./emailTemplates";
 
+const emailTransporter = nodemailer.createTransport({
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'apikey',
+    pass: process.env.SMTP_PASS
+  },
+});
+
+// Add this export (keep your existing export statement too)
+export { emailTransporter };
 
 export async function registerRoutes(app: Express): Promise<Server> {
 
@@ -477,6 +489,12 @@ app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => 
       return res.status(404).json({ message: "Trader profile not found" });
     }
 
+    // Get user details for notification email
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     // Update trader profile with verification details
     const trader = await storage.updateTrader(existingTrader.id, {
       businessName,
@@ -488,6 +506,150 @@ app.post('/api/trader/register', authenticate, async (req: AuthRequest, res) => 
       subdomain,
       status: 'verification_pending',
     });
+
+    // Send notification email to admin
+    try {
+      const documentTypeDisplayName = {
+        'national_id': 'National ID',
+        'drivers_license': "Driver's License",
+        'international_passport': 'International Passport'
+      };
+
+      const adminNotificationEmail = {
+        from: process.env.FROM_EMAIL,
+        to: 'tradyfi.ng@gmail.com',
+        subject: `🚨 New Trader Verification Submission - ${businessName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px;">🚨 New Trader Verification</h1>
+              <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Requires Admin Review</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+              <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">Trader Information</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555; width: 150px;">Business Name:</td>
+                    <td style="padding: 8px 0; color: #333;">${businessName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Subdomain:</td>
+                    <td style="padding: 8px 0; color: #333;">
+                      <strong style="color: #007bff;">${subdomain}.tradyfi.ng</strong>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Contact Info:</td>
+                    <td style="padding: 8px 0; color: #333;">${contactInfo}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Document Type:</td>
+                    <td style="padding: 8px 0; color: #333;">${documentTypeDisplayName[documentType]}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">User Account Details</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555; width: 150px;">Full Name:</td>
+                    <td style="padding: 8px 0; color: #333;">${user.firstName} ${user.lastName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Email:</td>
+                    <td style="padding: 8px 0; color: #333;">
+                      <a href="mailto:${user.email}" style="color: #007bff; text-decoration: none;">${user.email}</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">User ID:</td>
+                    <td style="padding: 8px 0; color: #333; font-family: monospace; font-size: 12px;">${user.id}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #555;">Submitted:</td>
+                    <td style="padding: 8px 0; color: #333;">
+                      ${new Date().toLocaleString('en-US', { 
+                        timeZone: 'Africa/Lagos',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })} (WAT)
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              ${profileDescription ? `
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">Profile Description</h2>
+                  <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #007bff;">
+                    <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${profileDescription}</p>
+                  </div>
+                </div>
+              ` : ''}
+
+              <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; margin: 0 0 15px 0; font-size: 20px;">Verification Document</h2>
+                <div style="background: #e8f4f8; padding: 15px; border-radius: 6px; border: 1px solid #bee5eb;">
+                  <p style="margin: 0 0 10px 0; color: #0c5460;">
+                    <strong>Document Type:</strong> ${documentTypeDisplayName[documentType]}
+                  </p>
+                  <p style="margin: 0; color: #0c5460;">
+                    <strong>Document URL:</strong> 
+                    <a href="${documentUrl}" target="_blank" style="color: #007bff; text-decoration: none; word-break: break-all;">
+                      View Document →
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="color: #856404; margin: 0 0 10px 0;">⚠️ Action Required</h3>
+                <p style="color: #856404; margin: 0 0 15px 0;">
+                  This trader verification requires admin review. Please verify the submitted documents and approve or reject the application.
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <a href="https://tradyfi.ng/admin/login" 
+                     style="display: inline-block; background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Review in Admin Panel
+                  </a>
+                  <a href="${documentUrl}" target="_blank"
+                     style="display: inline-block; background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    View Document
+                  </a>
+                </div>
+              </div>
+
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border-top: 3px solid #007bff; text-align: center;">
+                <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                  <strong>Verification Guidelines:</strong> Review document authenticity, business information accuracy, and subdomain appropriateness before approval.
+                </p>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px; padding: 15px; text-align: center; color: #6c757d; font-size: 12px; border-top: 1px solid #dee2e6;">
+              <p style="margin: 0;">
+                This is an automated notification from Tradyfi.ng trader verification system.<br>
+                Do not reply to this email. For support, contact <a href="mailto:support@tradyfi.ng" style="color: #007bff;">support@tradyfi.ng</a>
+              </p>
+            </div>
+          </div>
+        `
+      };
+
+      await emailTransporter.sendMail(adminNotificationEmail);
+      console.log('✅ Admin notification email sent successfully');
+
+    } catch (emailError) {
+      console.error('❌ Failed to send admin notification email:', emailError);
+      // Don't fail the registration if email fails, but log the error
+    }
 
     res.status(201).json({ 
       message: "Trader registration submitted for verification", 
@@ -1073,17 +1235,6 @@ app.get('/api/trader/subdomain/:subdomain', async (req, res) => {
     res.json({ message: "Logged out successfully" });
   });
 
-
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.sendgrid.net',
-  port: 587,
-  secure: false,
-  auth: {
-    user: 'apikey',
-    pass: process.env.SMTP_PASS
-  },
-});
-
 // const emailTransporter = nodemailer.createTransport({
 //   host: process.env.SMTP_HOST,
 //   port: process.env.SMTP_PORT,
@@ -1488,6 +1639,195 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { title, email, fullName, body } = req.body;
+    
+    // Validate required fields
+    if (!title || !email || !fullName || !body) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Validate email format
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Sanitize input to prevent HTML injection
+    const sanitizeInput = (input: string) => {
+      return input
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;');
+    };
+
+    const sanitizedTitle = sanitizeInput(title);
+    const sanitizedFullName = sanitizeInput(fullName);
+    const sanitizedBody = sanitizeInput(body);
+
+    // Send email to Tradyfi.ng support
+    const mailOptions = {
+      from: process.env.FROM_EMAIL,
+      to: 'tradyfi.ng@gmail.com',
+      replyTo: email, // Allow replying directly to the sender
+      subject: `Contact Form: ${sanitizedTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #333; margin: 0 0 10px 0;">New Contact Form Submission</h2>
+            <p style="color: #666; margin: 0; font-size: 14px;">
+              Received: ${new Date().toLocaleString('en-US', { 
+                timeZone: 'Africa/Lagos',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              })} (WAT)
+            </p>
+          </div>
+          
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #333; margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #e9ecef;">
+              Contact Information
+            </h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold; color: #555; width: 120px;">Full Name:</td>
+                <td style="padding: 8px 0; color: #333;">${sanitizedFullName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold; color: #555;">Email:</td>
+                <td style="padding: 8px 0; color: #333;">
+                  <a href="mailto:${email}" style="color: #007bff; text-decoration: none;">${email}</a>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold; color: #555;">Subject:</td>
+                <td style="padding: 8px 0; color: #333;">${sanitizedTitle}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #333; margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 2px solid #e9ecef;">
+              Message
+            </h3>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #007bff;">
+              <p style="margin: 0; color: #333; line-height: 1.6; white-space: pre-wrap;">${sanitizedBody}</p>
+            </div>
+          </div>
+
+          <div style="background: #e9ecef; padding: 15px; border-radius: 6px; margin-top: 20px;">
+            <h4 style="color: #333; margin: 0 0 10px 0;">Quick Actions</h4>
+            <p style="margin: 5px 0; font-size: 14px;">
+              <strong>Reply:</strong> 
+              <a href="mailto:${email}?subject=Re: ${encodeURIComponent(sanitizedTitle)}" 
+                 style="color: #007bff; text-decoration: none;">
+                Email ${sanitizedFullName}
+              </a>
+            </p>
+            <p style="margin: 5px 0; font-size: 14px;">
+              <strong>Call:</strong> Check if phone number was provided in the message
+            </p>
+          </div>
+
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6; text-align: center;">
+            <p style="margin: 0; color: #6c757d; font-size: 12px;">
+              This message was sent via the Tradyfi.ng contact form.<br>
+              Please respond within 24 hours to maintain our support standards.
+            </p>
+          </div>
+        </div>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+
+    // Optional: Send confirmation email to the user
+    const confirmationMailOptions = {
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: `Message Received - ${sanitizedTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <img src="https://tradyfi.ng/logo.png" alt="Tradyfi.ng" style="height: 40px;" />
+          </div>
+          
+          <h2 style="color: #333; text-align: center;">Thank You for Contacting Us!</h2>
+          
+          <p style="color: #555; line-height: 1.6;">
+            Hi ${sanitizedFullName},
+          </p>
+          
+          <p style="color: #555; line-height: 1.6;">
+            We've received your message about "<strong>${sanitizedTitle}</strong>" and appreciate you taking the time to reach out to us.
+          </p>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+            <h3 style="color: #333; margin: 0 0 10px 0;">What happens next?</h3>
+            <ul style="color: #555; margin: 0; padding-left: 20px;">
+              <li>Our support team will review your message within 24 hours</li>
+              <li>We'll respond to your inquiry at <strong>${email}</strong></li>
+              <li>For urgent matters, you can call us at +234 818 658 6280</li>
+            </ul>
+          </div>
+          
+          <p style="color: #555; line-height: 1.6;">
+            In the meantime, you might find answers to common questions in our 
+            <a href="https://tradyfi.ng/help" style="color: #007bff; text-decoration: none;">help center</a>.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="color: #555;">Need immediate assistance?</p>
+            <a href="tel:+2348186586280" 
+               style="display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px;">
+              Call Support
+            </a>
+            <a href="mailto:hey@tradyfi.ng" 
+               style="display: inline-block; background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 5px;">
+              Email Support
+            </a>
+          </div>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center;">
+            <p style="color: #6c757d; font-size: 14px; margin: 0;">
+              Best regards,<br>
+              The Tradyfi.ng Support Team
+            </p>
+            <p style="color: #6c757d; font-size: 12px; margin: 10px 0 0 0;">
+              Lagos, Nigeria | hey@tradyfi.ng | +234 818 658 6280
+            </p>
+          </div>
+        </div>
+      `
+    };
+
+    try {
+      await emailTransporter.sendMail(confirmationMailOptions);
+    } catch (confirmationError) {
+      console.error('Failed to send confirmation email:', confirmationError);
+      // Don't fail the main request if confirmation email fails
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Message sent successfully. We'll get back to you within 24 hours." 
+    });
+
+  } catch (error) {
+    console.error("Contact form error:", error);
+    res.status(500).json({ 
+      message: "Failed to send message. Please try again later." 
+    });
+  }
+});
+
   // Resend OTP
   app.post('/api/auth/resend-otp', async (req, res) => {
     try {
@@ -1598,3 +1938,4 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
   return httpServer;
 }
+

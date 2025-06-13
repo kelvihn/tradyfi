@@ -28,6 +28,11 @@ import {
   fcmTokens,
   FCMToken,
   InsertFCMToken,
+  userActivity,
+  emailNotifications,
+  notificationPreferences,
+  type NotificationPreference,
+  type InsertNotificationPreference,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count, sql, or, ne, exists } from "drizzle-orm";
@@ -110,6 +115,18 @@ export interface IStorage {
   getUserPushSubscriptions(userId: string): Promise<UserPushSubscription[]>;
   updatePushSubscription(id: string, updates: Partial<InsertUserPushSubscription>): Promise<UserPushSubscription>;
   deletePushSubscription(userId: string, endpoint?: string): Promise<void>;
+
+  updateUserLastActivity(userId: string): Promise<void>;
+  getUserLastActivity(userId: string): Promise<Date | null>;
+  
+  // Email notification tracking
+  recordEmailNotificationSent(userId: string, roomId: number): Promise<void>;
+  getLastEmailNotificationTime(userId: string, roomId: number): Promise<Date | null>;
+  getTodayEmailCount(userId: string): Promise<number>;
+  
+  // Notification preferences
+  getNotificationPreferences(userId: string): Promise<NotificationPreference>;
+  updateNotificationPreferences(userId: string, preferences: Partial<InsertNotificationPreference>): Promise<NotificationPreference>;
   
 }
 
@@ -1089,6 +1106,179 @@ async getUnreadMessageCount(chatRoomId: number, userId: string): Promise<number>
     );
   return result.count;
 }
+
+async updateUserLastActivity(userId: string): Promise<void> {
+  try {
+    await db
+      .insert(userActivity)
+      .values({
+        userId,
+        lastActivity: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: userActivity.userId,
+        set: {
+          lastActivity: new Date(),
+        },
+      });
+    
+    console.log(`📍 Updated activity for user ${userId}`);
+  } catch (error) {
+    console.error('Error updating user activity:', error);
+    throw error;
+  }
+}
+
+async getUserLastActivity(userId: string): Promise<Date | null> {
+  try {
+    const [result] = await db
+      .select({ lastActivity: userActivity.lastActivity })
+      .from(userActivity)
+      .where(eq(userActivity.userId, userId))
+      .limit(1);
+    
+    return result?.lastActivity || null;
+  } catch (error) {
+    console.error('Error getting user last activity:', error);
+    return null;
+  }
+}
+
+// Email notification tracking
+async recordEmailNotificationSent(userId: string, roomId: number): Promise<void> {
+  try {
+    await db
+      .insert(emailNotifications)
+      .values({
+        userId,
+        roomId,
+        sentAt: new Date(),
+        notificationType: 'chat_message',
+      });
+    
+    console.log(`📧 Recorded email notification for user ${userId} in room ${roomId}`);
+  } catch (error) {
+    console.error('Error recording email notification:', error);
+    throw error;
+  }
+}
+
+async getLastEmailNotificationTime(userId: string, roomId: number): Promise<Date | null> {
+  try {
+    const [result] = await db
+      .select({ sentAt: emailNotifications.sentAt })
+      .from(emailNotifications)
+      .where(
+        and(
+          eq(emailNotifications.userId, userId),
+          eq(emailNotifications.roomId, roomId)
+        )
+      )
+      .orderBy(desc(emailNotifications.sentAt))
+      .limit(1);
+    
+    return result?.sentAt || null;
+  } catch (error) {
+    console.error('Error getting last email notification time:', error);
+    return null;
+  }
+}
+
+async getTodayEmailCount(userId: string): Promise<number> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const [result] = await db
+      .select({ count: count() })
+      .from(emailNotifications)
+      .where(
+        and(
+          eq(emailNotifications.userId, userId),
+          sql`${emailNotifications.sentAt} >= ${today}`,
+          sql`${emailNotifications.sentAt} < ${tomorrow}`
+        )
+      );
+    
+    return result.count;
+  } catch (error) {
+    console.error('Error getting today email count:', error);
+    return 0;
+  }
+}
+
+// Notification preferences
+async getNotificationPreferences(userId: string): Promise<NotificationPreference> {
+  try {
+    const [result] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId))
+      .limit(1);
+    
+    // Return default preferences if none found
+    if (!result) {
+      const defaultPrefs: InsertNotificationPreference = {
+        userId,
+        emailEnabled: true,
+        emailAggregationMinutes: 5,
+        quietHoursStart: '22:00',
+        quietHoursEnd: '08:00',
+        urgentOnly: false,
+        businessHoursOnly: true,
+      };
+      
+      return await this.updateNotificationPreferences(userId, defaultPrefs);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error getting notification preferences:', error);
+    // Return safe defaults if database error
+    return {
+      id: '',
+      userId,
+      emailEnabled: true,
+      emailAggregationMinutes: 5,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '08:00',
+      urgentOnly: false,
+      businessHoursOnly: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+}
+
+async updateNotificationPreferences(userId: string, preferences: Partial<InsertNotificationPreference>): Promise<NotificationPreference> {
+  try {
+    const [result] = await db
+      .insert(notificationPreferences)
+      .values({
+        userId,
+        ...preferences,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: notificationPreferences.userId,
+        set: {
+          ...preferences,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    
+    console.log(`⚙️ Updated notification preferences for user ${userId}`);
+    return result;
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    throw error;
+  }
+}
+
+
 }
 
 export const storage = new DatabaseStorage();

@@ -46,11 +46,19 @@ export const emailTemplates = {
                   <span style="color: #666; margin-left: 5px;">Monitor portal visits and client engagement</span>
                 </div>
               </div>
+
+              <div style="display: flex; align-items: flex-start; margin: 12px 0;">
+                <span style="color: #667eea; font-weight: bold; margin-right: 10px;">🟢</span>
+                <div>
+                  <strong style="color: #333;">Connect to Whatsapp:</strong>
+                  <span style="color: #666; margin-left: 5px;">Redirect users from your trading portal to Whatsapp</span>
+                </div>
+              </div>
               
               <div style="display: flex; align-items: flex-start; margin: 12px 0;">
                 <span style="color: #667eea; font-weight: bold; margin-right: 10px;">🎯</span>
                 <div>
-                  <strong style="color: #333;">5-Day Free Trial:</strong>
+                  <strong style="color: #333;">7-Day Free Trial:</strong>
                   <span style="color: #666; margin-left: 5px;">Experience all features risk-free</span>
                 </div>
               </div>

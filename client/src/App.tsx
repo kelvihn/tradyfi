@@ -31,6 +31,12 @@ import { useSubdomainValidator } from "./hooks/useSubdomainValidator";
 import ForgotPassword from "@/pages/forgot-password";
 import VerifyResetOTP from "@/pages/verify-reset-otp";
 import ResetPassword from "@/pages/reset-password";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import ContactUs from "@/pages/contact-us";
+
+// Import chat components
+import { ChatInterface } from "@/components/chat/chat-interface";
+import { useUserAuth } from "@/hooks/useUserAuth";
 
 import { AuthProvider } from "@/hooks/useAuth";
 
@@ -44,6 +50,128 @@ function App() {
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
+  );
+}
+
+// Protected Route Component for Trader Routes
+function ProtectedTraderRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const { data: traderStatus, isLoading: traderLoading } = useQuery({
+    queryKey: ["/api/trader/status"],
+    retry: false,
+    enabled: !!user && !isLoading,
+  });
+
+  if (isLoading || traderLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  // Return 404 if not authenticated or not a trader
+  if (!user || !traderStatus || traderStatus.status !== 'verified') {
+    return <NotFound />;
+  }
+
+  return <>{children}</>;
+}
+
+// Protected Route Component for Admin Routes
+function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  // Return 404 if not authenticated or not an admin
+  if (!user || (user as any).role !== 'admin') {
+    return <NotFound />;
+  }
+
+  return <>{children}</>;
+}
+
+// Trader Chat Route Component
+function TraderChatRoute({ roomId }: { roomId: string }) {
+  const { user, isLoading } = useAuth();
+  const { data: traderStatus, isLoading: traderLoading } = useQuery({
+    queryKey: ["/api/trader/status"],
+    retry: false,
+    enabled: !!user && !isLoading,
+  });
+
+  if (isLoading || traderLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user || !traderStatus || traderStatus.status !== 'verified') {
+    return <NotFound />;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b bg-white px-6 py-4">
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={() => window.location.href = '/trader/dashboard'}
+            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+          </button>
+          <div>
+            <h1 className="text-xl font-semibold">Chat Room #{roomId}</h1>
+            <p className="text-sm text-slate-600">Trader Chat Interface</p>
+          </div>
+        </div>
+      </div>
+      <ChatInterface 
+        roomId={parseInt(roomId)} 
+        userId={user.id} 
+        onBack={() => window.location.href = '/trader/dashboard'}
+      />
+    </div>
+  );
+}
+
+// User Chat Route Component for Subdomains
+function UserChatRoute({ roomId, subdomain }: { roomId: string; subdomain: string }) {
+  const { user, isAuthenticated, isLoading } = useUserAuth();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <NotFound />;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b bg-white px-6 py-4">
+        <div className="flex items-center space-x-4">
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Portal
+          </button>
+          <div>
+            <h1 className="text-xl font-semibold">Chat Room #{roomId}</h1>
+            <p className="text-sm text-slate-600">Trading Chat</p>
+          </div>
+        </div>
+      </div>
+      <ChatInterface 
+        roomId={parseInt(roomId)} 
+        userId={user.id} 
+        onBack={() => window.location.href = '/'}
+      />
+    </div>
   );
 }
 
@@ -97,18 +225,24 @@ function Router() {
       return <Route path="/" component={Landing} />;
     }
 
-    console.log("it broke here");
     return (
       <Switch>
         <Route path="/login" component={UserLogin} />
         <Route path="/register" component={UserRegister} />
+
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/contact" component={ContactUs} />
         
         {/* Add password reset routes for subdomains */}
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/verify-reset-otp" component={VerifyResetOTP} />
         <Route path="/reset-password" component={ResetPassword} />
         
-        <Route path="/chat/:roomId" component={() => <UserPortal subdomain={subdomain} />} />
+        {/* Separate chat route for better navigation */}
+        <Route path="/chat/:roomId">
+          {(params) => <UserChatRoute roomId={params.roomId} subdomain={subdomain} />}
+        </Route>
+        
         <Route path="/" component={() => <UserPortal subdomain={subdomain} />} />
         <Route component={NotFound} />
       </Switch>
@@ -120,13 +254,21 @@ function Router() {
     return (
       <Switch>
         <Route path="/login" component={AdminLogin} />
+
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/contact" component={ContactUs} />
         
         {/* Add password reset routes for admin subdomain */}
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/verify-reset-otp" component={VerifyResetOTP} />
         <Route path="/reset-password" component={ResetPassword} />
         
-        <Route path="/" component={isAuthenticated ? AdminDashboard : AdminLogin} />
+        {/* Protected admin routes */}
+        <Route path="/">
+          <ProtectedAdminRoute>
+            <AdminDashboard />
+          </ProtectedAdminRoute>
+        </Route>
         <Route component={NotFound} />
       </Switch>
     );
@@ -139,42 +281,53 @@ function Router() {
 
   return (
     <Switch>
-      {/* Admin routes - available to both authenticated and non-authenticated */}
-      <Route path="/admin/login" component={AdminLogin} />
-      <Route path="/admin" component={AdminDashboard} />
+      {/* Public routes - available to everyone */}
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/contact" component={ContactUs} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/verify-reset-otp" component={VerifyResetOTP} />
+      <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/payment-success" component={PaymentSuccess} />
       
-      {isAuthenticated ? (
-        <>
-          <Route path="/" component={TraderRedirect} />
+      {/* Admin routes - separate login, protected dashboard */}
+      <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin">
+        <ProtectedAdminRoute>
+          <AdminDashboard />
+        </ProtectedAdminRoute>
+      </Route>
+      
+      {/* Protected trader routes */}
+      <Route path="/trader/register" component={TraderRegister} />
+      <Route path="/trader/dashboard">
+        <ProtectedTraderRoute>
+          <TraderDashboard />
+        </ProtectedTraderRoute>
+      </Route>
+      <Route path="/trader/profile">
+        <ProtectedTraderRoute>
+          <TraderProfile />
+        </ProtectedTraderRoute>
+      </Route>
+      <Route path="/trader/chat/:roomId">
+        {(params) => <TraderChatRoute roomId={params.roomId} />}
+      </Route>
+      
+      {/* General authenticated routes */}
+      {isAuthenticated && (
+        <> 
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/contact" component={ContactUs} />
           <Route path="/home" component={Home} />
-          <Route path="/trader/register" component={TraderRegister} />
-          <Route path="/trader/profile" component={TraderProfile} />
-          <Route path="/trader/dashboard" component={TraderDashboard} />
-          
-          {/* Password reset routes available to authenticated users */}
-          <Route path="/forgot-password" component={ForgotPassword} />
-          <Route path="/verify-reset-otp" component={VerifyResetOTP} />
-          <Route path="/reset-password" component={ResetPassword} />
-          
           <Route path="/test-portal" component={TestTraderPortal} />
-          <Route path="/payment-success" component={PaymentSuccess} />
-          <Route component={NotFound} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/login" component={Login} />
-          <Route path="/register" component={Register} />
-          
-          {/* Password reset routes available to non-authenticated users */}
-          <Route path="/forgot-password" component={ForgotPassword} />
-          <Route path="/verify-reset-otp" component={VerifyResetOTP} />
-          <Route path="/reset-password" component={ResetPassword} />
-          
-          <Route path="/payment-success" component={PaymentSuccess} />
-          <Route component={NotFound} />
         </>
       )}
+      
+      {/* Catch-all 404 route */}
+      <Route component={NotFound} />
     </Switch>
   );
 }

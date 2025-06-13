@@ -7,6 +7,8 @@ import {
   index,
   serial,
   boolean,
+  unique,
+  time,
   pgEnum,
   integer,
 } from "drizzle-orm/pg-core";
@@ -24,6 +26,48 @@ export const sessions = pgTable(
   },
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
+
+export const userActivity = pgTable("user_activity", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  lastActivity: timestamp("last_activity").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueUserId: unique().on(table.userId),
+}));
+
+// Email notifications tracking table
+export const emailNotifications = pgTable("email_notifications", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  roomId: integer("room_id").notNull().references(() => chatRooms.id),
+  sentAt: timestamp("sent_at").notNull(),
+  notificationType: varchar("notification_type", { length: 50 }).default("chat_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notification preferences table
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id).unique(),
+  emailEnabled: boolean("email_enabled").default(true),
+  emailAggregationMinutes: integer("email_aggregation_minutes").default(5),
+  quietHoursStart: time("quiet_hours_start").default("22:00"),
+  quietHoursEnd: time("quiet_hours_end").default("08:00"),
+  urgentOnly: boolean("urgent_only").default(false),
+  businessHoursOnly: boolean("business_hours_only").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UserActivity = typeof userActivity.$inferSelect;
+export type InsertUserActivity = typeof userActivity.$inferInsert;
+
+export type EmailNotification = typeof emailNotifications.$inferSelect;
+export type InsertEmailNotification = typeof emailNotifications.$inferInsert;
+
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
 
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id", { length: 191 }).primaryKey().notNull(),

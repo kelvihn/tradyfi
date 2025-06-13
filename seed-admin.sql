@@ -5,7 +5,7 @@
 DO $$
 BEGIN
     -- Delete existing admin user if it exists
-    DELETE FROM users WHERE email = 'admin@tradyfi.ng';
+    DELETE FROM users WHERE email = 'admin@besttrades.ng';
     
     -- Insert new admin user with hashed password
     -- Password is 'admin123' hashed with bcrypt
@@ -20,14 +20,14 @@ BEGIN
         updated_at
     ) VALUES (
         'admin_render_' || extract(epoch from now())::text,
-        'admin@tradyfi.ng',
+        'tegatheadmin@tradyfi.ng',
         'Admin',
         'User',
-        'admin123',
+        '12KAreokeko@2025$$',
         'admin',
         NOW(),
         NOW()
     );
     
-    RAISE NOTICE 'Admin user created successfully with email: admin@tradyfi.ng and password: admin123';
+    RAISE NOTICE 'Admin user created successfully';
 END $$;

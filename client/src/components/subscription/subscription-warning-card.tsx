@@ -414,7 +414,7 @@ export function SubscriptionWarningCard({ traderStatus }: SubscriptionWarningCar
               <Button 
                 onClick={() => upgradeMutation.mutate(premiumPlan.id)}
                 disabled={upgradeMutation.isPending}
-                className={isTrialCard ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}
+                className={isTrialCard ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}
               >
                 {upgradeMutation.isPending ? (
                   <>
@@ -423,7 +423,7 @@ export function SubscriptionWarningCard({ traderStatus }: SubscriptionWarningCar
                   </>
                 ) : (
                   <>
-                    <CreditCard className="h-4 w-4 mr-2" />
+                    <CreditCard className="h-4 w-4 mr-2 text-white" />
                     {isTrialCard 
                       ? (daysLeft <= 1 ? 'Upgrade Before Trial Ends' : 'Upgrade Now') 
                       : (isOnTrial && daysLeft <= 0 ? 'Continue with Premium' : 'Upgrade Now')

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChartLine, Users, MessageCircle, Settings, LogOut, AlertCircle, Clock, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import Footer from "@/components/footer";
 
 export default function Home() {
   const { user } = useAuth();
@@ -57,14 +58,9 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <ChartLine className="text-white text-lg" />
-              </div>
-              <span className="ml-3 text-xl font-bold text-slate-900">Tradyfi.ng</span>
-            </div>
+           <img className="text-white text-lg" src="/logo.png"/>
             <div className="flex items-center space-x-4">
-              <span className="text-slate-600">Welcome, {user?.firstName || user?.email}</span>
+              {/* <span className="text-slate-600">Welcome, {user?.firstName || user?.email}</span> */}
               <Button variant="ghost" onClick={logout} className="text-slate-600">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -138,6 +134,7 @@ export default function Home() {
                     <p>Your subdomain: <strong>{traderStatus.subdomain}.tradyfi.ng</strong></p>
                     <p>Business Name: {traderStatus.businessName}</p>
                   </div>
+                  <br></br>
                   <Link href="/trader/dashboard">
                     <Button className="btn-primary">
                       <ChartLine className="h-4 w-4 mr-2" />
@@ -358,25 +355,12 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* Quick Links */}
-        <div className="mt-12 bg-white rounded-xl p-6 border border-slate-200">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Quick Links</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <a href="#" className="text-primary hover:text-primary/80 text-sm font-medium">
-              Platform Documentation
-            </a>
-            <a href="#" className="text-primary hover:text-primary/80 text-sm font-medium">
-              Trading Guidelines
-            </a>
-            <a href="#" className="text-primary hover:text-primary/80 text-sm font-medium">
-              Support Center
-            </a>
-            <a href="#" className="text-primary hover:text-primary/80 text-sm font-medium">
-              Contact Us
-            </a>
-          </div>
-        </div>
+       
       </div>
+      {/* Footer */}
+       <div className="py-20"></div>
+      <Footer/>
     </div>
+    
   );
 }

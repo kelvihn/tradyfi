@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChartLine, MessageCircle, Users, Globe, ExternalLink, Plus, Clock, DollarSign, ArrowLeft, User, Edit } from "lucide-react";
-import { ChatInterface } from "@/components/chat/chat-interface";
 import { SubscriptionCard } from "@/components/subscription/subscription-card";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useUserAuth } from "@/hooks/useUserAuth";
@@ -18,7 +17,6 @@ import type { Trader } from "@shared/schema";
 import { SubscriptionWarningCard } from "@/components/subscription/subscription-warning-card";
 
 export default function TraderDashboard() {
-  const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [profileForm, setProfileForm] = useState({
     businessName: '',
     contactInfo: '',
@@ -29,27 +27,26 @@ export default function TraderDashboard() {
   const { logout } = useAuth();
   const { toast } = useToast();
 
-
   // Fetch real trader chat rooms
   const { data: traderChats = [], isLoading: chatsLoading } = useQuery({
-  queryKey: ['/api/chat/trader/chats'], // Updated endpoint
-  queryFn: async () => {
-    const token = localStorage.getItem('token');
-    const response = await fetch('/api/chat/trader/chats', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch trader chats: ${response.status}`);
-    }
-    
-    return response.json();
-  },
-  enabled: !!user && (user as any).role === 'trader',
-});
+    queryKey: ['/api/chat/trader/chats'],
+    queryFn: async () => {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/chat/trader/chats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch trader chats: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    enabled: !!user && (user as any).role === 'trader',
+  });
 
   // Fetch real trader statistics
   const { data: traderStats = { portalVisits: 0, transactions: 0 }, isLoading: statsLoading } = useQuery({
@@ -146,6 +143,11 @@ export default function TraderDashboard() {
     updateProfileMutation.mutate(updateData);
   };
 
+  // Handle chat navigation
+  const handleViewChat = (chatId: number) => {
+    window.location.href = `/trader/chat/${chatId}`;
+  };
+
   if (userLoading || chatsLoading || traderLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -153,36 +155,6 @@ export default function TraderDashboard() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-slate-600">Loading dashboard...</p>
         </div>
-      </div>
-    );
-  }
-
-  // Show chat interface if a chat is selected
-  if (selectedChat) {
-    const selectedChatData = (traderChats as any)?.find((chat: any) => chat.id === selectedChat);
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="border-b bg-white px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setSelectedChat(null)}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold">
-                Chat: {selectedChatData?.tradingOption?.replace('_', ' ')}
-              </h1>
-              <p className="text-sm text-slate-600">
-                User: {selectedChatData?.userName || 'Unknown User'}
-              </p>
-            </div>
-          </div>
-        </div>
-        <ChatInterface roomId={selectedChat} userId={user?.id || ''} />
       </div>
     );
   }
@@ -222,8 +194,6 @@ export default function TraderDashboard() {
           </div>
         </div>
       </header>
-
-      
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <SubscriptionWarningCard traderStatus={traderStatus} />
@@ -437,7 +407,7 @@ export default function TraderDashboard() {
                         <div className="flex justify-end mt-3">
                           <Button 
                             size="sm" 
-                            onClick={() => setSelectedChat(chat.id)}
+                            onClick={() => handleViewChat(chat.id)}
                           >
                             View Chat
                           </Button>

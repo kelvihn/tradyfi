@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { Link } from "wouter";
+import Footer from "@/components/footer";
 
 export default function Landing() {
 
@@ -266,57 +267,8 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="md:col-span-1">
-              <img className="text-white text-lg" src="/logo.png" />
-              <p className="text-slate-400 mb-4">
-                Professional crypto trading platform connecting independent traders with users through personalized portals.
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Platform</h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Verification Process</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-slate-400">
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Compliance</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-800 pt-8 mt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-slate-400 text-sm">
-              © 2025 Tradyfi.ng. All rights reserved.
-            </p>
-            <div className="flex items-center space-x-6 mt-4 md:mt-0">
-              <div className="flex items-center text-slate-400 text-sm">
-                <Shield className="text-green-500 mr-2 h-4 w-4" />
-                NIN Verified Platform
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer/>
+     
     </div>
   );
 }

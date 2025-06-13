@@ -104,7 +104,7 @@ export default function Login() {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         console.log('🚀 Navigating to home...');
-        navigate("/", { replace: true });
+        navigate("/home", { replace: true });
         
       } catch (error) {
         console.error('❌ Error updating auth state:', error);

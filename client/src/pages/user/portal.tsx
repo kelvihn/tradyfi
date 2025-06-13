@@ -16,7 +16,6 @@ import {
   LogOut,
   User
 } from "lucide-react";
-import { ChatInterface } from "@/components/chat/chat-interface";
 import { useUserAuth } from "@/hooks/useUserAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { getSubdomain } from "@/lib/subdomain";
@@ -27,7 +26,6 @@ interface UserPortalProps {
 
 export default function UserPortal({ subdomain }: UserPortalProps) {
   const [selectedService, setSelectedService] = useState<string | null>(null);
-  const [activeChat, setActiveChat] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { user, isLoading, isAuthenticated } = useUserAuth();
 
@@ -109,8 +107,8 @@ export default function UserPortal({ subdomain }: UserPortalProps) {
     },
     onSuccess: (chatRoom) => {
       console.log('Chat room created successfully:', chatRoom);
-      setActiveChat(chatRoom.id);
-      setSelectedService(null);
+      // Navigate to the chat route instead of showing inline
+      window.location.href = `/chat/${chatRoom.id}`;
       // Refetch chat rooms to update the list
       queryClient.invalidateQueries({ queryKey: ["chat", "rooms"] });
     },
@@ -120,32 +118,32 @@ export default function UserPortal({ subdomain }: UserPortalProps) {
   });
 
   // Logout mutation
-const logoutMutation = useMutation({
-  mutationFn: async () => {
-    // For subdomain users, we can just clear tokens locally
-    // No need for server-side logout since we're using JWT
-    return Promise.resolve();
-  },
-  onSuccess: () => {
-    // Clear subdomain-specific tokens
-    localStorage.removeItem(`userToken_${subdomain}`);
-    localStorage.removeItem(`userData_${subdomain}`);
-    
-    // Clear any cached queries
-    queryClient.clear();
-    
-    // Redirect to login page on same subdomain
-    window.location.href = `/`;
-  },
-  onError: (error) => {
-    console.error('Logout error:', error);
-    // Even if there's an error, still clear tokens and redirect
-    localStorage.removeItem(`userToken_${subdomain}`);
-    localStorage.removeItem(`userData_${subdomain}`);
-    queryClient.clear();
-    window.location.href = `/`;
-  }
-});
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      // For subdomain users, we can just clear tokens locally
+      // No need for server-side logout since we're using JWT
+      return Promise.resolve();
+    },
+    onSuccess: () => {
+      // Clear subdomain-specific tokens
+      localStorage.removeItem(`userToken_${subdomain}`);
+      localStorage.removeItem(`userData_${subdomain}`);
+      
+      // Clear any cached queries
+      queryClient.clear();
+      
+      // Redirect to login page on same subdomain
+      window.location.href = `/`;
+    },
+    onError: (error) => {
+      console.error('Logout error:', error);
+      // Even if there's an error, still clear tokens and redirect
+      localStorage.removeItem(`userToken_${subdomain}`);
+      localStorage.removeItem(`userData_${subdomain}`);
+      queryClient.clear();
+      window.location.href = `/`;
+    }
+  });
 
   const handleServiceClick = (service: string) => {
     setSelectedService(service);
@@ -153,11 +151,8 @@ const logoutMutation = useMutation({
 
   const handleWhatsappClick = () => {
     const message = "Hello! I'm interested in your trading services.";
-
     const formattedNumber = trader?.contactInfo.replace(/\D/g, '');
-
     const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
-
     window.open(whatsappUrl, '_blank');
   };
 
@@ -168,6 +163,11 @@ const logoutMutation = useMutation({
 
   const handleLogout = () => {
     logoutMutation.mutate();
+  };
+
+  // Handle chat navigation
+  const handleViewChat = (chatId: number) => {
+    window.location.href = `/chat/${chatId}`;
   };
 
   // Show loading state while checking authentication and trader data
@@ -230,40 +230,6 @@ const logoutMutation = useMutation({
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Show chat interface when activeChat is set
-  if (activeChat && user?.id) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setActiveChat(null)}
-                  className="mr-4"
-                >
-                  ← Back
-                </Button>
-                <h1 className="text-lg font-semibold">Chat with {trader?.businessName || 'Trader'}</h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-slate-600">
-                  Welcome, {user?.firstName}
-                </span>
-                <Button variant="outline" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
-        <ChatInterface roomId={activeChat} userId={user.id} />
       </div>
     );
   }
@@ -412,7 +378,7 @@ const logoutMutation = useMutation({
             <h3 className="text-2xl font-bold text-slate-900 mb-6">Your Active Conversations</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {userChats.map((chat: any) => (
-                <Card key={chat.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveChat(chat.id)}>
+                <Card key={chat.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleViewChat(chat.id)}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-3">
