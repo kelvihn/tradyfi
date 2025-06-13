@@ -202,7 +202,7 @@ app.post('/api/user/register', async (req, res) => {
         return res.status(401).json({ message: "Invalid admin credentials" });
       }
 
-      const isValidPassword = password === user.password;
+      const isValidPassword = comparePassword(password, user.password);
 
       console.log("is password valid: ", isValidPassword);
       if (!isValidPassword) {
