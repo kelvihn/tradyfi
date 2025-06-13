@@ -140,6 +140,7 @@ export const traders = pgTable("traders", {
   emailVerified: boolean('email_verified').default(false).notNull(),
   status: varchar("status", { enum: ["unverified", "verification_pending", "verified", "suspended", "rejected"] }).default("unverified"),
   profileDescription: text("profile_description"),
+  deactivationReason: text("deactivation_reason"), // Add this field
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

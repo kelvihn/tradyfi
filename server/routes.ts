@@ -13,7 +13,7 @@ import { sendWelcomeEmail } from "./emailTemplates";
 const emailTransporter = nodemailer.createTransport({
   host: 'smtp.sendgrid.net',
   port: 587,
-  secure: true,
+  secure: false,
   auth: {
     user: 'apikey',
     pass: process.env.SMTP_PASS
@@ -84,8 +84,6 @@ app.post('/api/user/login', async (req, res) => {
 
     // Custom function that performs the correct JOIN across tables
     const user = await storage.getUserByEmailAndSubdomain(email, subdomain);
-
-    console.log("user is @@@@", user);
 
     if (!user || user.role !== 'user') {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -427,16 +425,26 @@ app.get('/api/trader/check-domain-validity/:domain', async (req, res) => {
   });
 
   // Get trader status
-  app.get('/api/trader/status', authenticate, async (req: AuthRequest, res) => {
-    try {
-      const userId = req.user!.id;
-      const trader = await storage.getTraderByUserId(userId);
-      res.json(trader || null);
-    } catch (error) {
-      console.error("Error fetching trader status:", error);
-      res.status(500).json({ message: "Failed to fetch trader status" });
+ app.get('/api/trader/status', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const trader = await storage.getTraderByUserId(userId);
+    
+    // If trader is suspended, include the reason in the response
+    if (trader && trader.status === 'suspended') {
+      return res.json({
+        ...trader,
+        isSuspended: true,
+        suspensionReason: trader.deactivationReason || 'Account has been temporarily suspended'
+      });
     }
-  });
+    
+    res.json(trader || null);
+  } catch (error) {
+    console.error("Error fetching trader status:", error);
+    res.status(500).json({ message: "Failed to fetch trader status" });
+  }
+});
 
   // Trader verification (update existing trader with business details)
 // Updated registration route in routes.ts
@@ -1012,33 +1020,54 @@ app.post('/api/admin/traders/:id/approve', authenticate, async (req: AuthRequest
   });
 
   // Trader portal routes
-  app.get('/api/trader/portal/:subdomain', async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      const trader = await storage.getTraderBySubdomain(subdomain);
-      
-      if (!trader) {
-        return res.status(404).json({ message: 'Trader portal not found' });
-      }
-      
-      if (trader.status !== 'verified') {
-        return res.status(403).json({ message: 'Trader portal is not active' });
-      }
-      
-      // Return public trader information
-      res.json({
-        id: trader.id,
-        businessName: trader.businessName,
-        profileDescription: trader.profileDescription,
-        contactInfo: trader.contactInfo,
-        subdomain: trader.subdomain,
-        status: trader.status
-      });
-    } catch (error) {
-      console.error('Error fetching trader portal:', error);
-      res.status(500).json({ message: 'Failed to fetch trader portal' });
+ app.get('/api/trader/portal/:subdomain', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+    const trader = await storage.getTraderBySubdomain(subdomain);
+    
+    if (!trader) {
+      return res.status(404).json({ message: 'Trader portal not found' });
     }
-  });
+    
+    // Check if trader is verified AND not suspended
+    if (trader.status !== 'verified') {
+      let message = 'Trader portal is not active';
+      
+      // Provide specific messages for different statuses
+      switch (trader.status) {
+        case 'suspended':
+          message = 'This trader portal has been temporarily suspended';
+          break;
+        case 'verification_pending':
+          message = 'Trader portal is pending verification';
+          break;
+        case 'rejected':
+          message = 'Trader portal access has been denied';
+          break;
+        case 'unverified':
+          message = 'Trader portal is not yet verified';
+          break;
+        default:
+          message = 'Trader portal is not active';
+      }
+      
+      return res.status(403).json({ message });
+    }
+    
+    // Return public trader information
+    res.json({
+      id: trader.id,
+      businessName: trader.businessName,
+      profileDescription: trader.profileDescription,
+      contactInfo: trader.contactInfo,
+      subdomain: trader.subdomain,
+      status: trader.status
+    });
+  } catch (error) {
+    console.error('Error fetching trader portal:', error);
+    res.status(500).json({ message: 'Failed to fetch trader portal' });
+  }
+});
 
   app.get('/api/trader/:subdomain/auth', authenticate, async (req: AuthRequest, res) => {
     try {
@@ -1827,6 +1856,205 @@ app.post('/api/contact', async (req, res) => {
     });
   }
 });
+
+
+// Add these routes to your routes.ts file after the existing admin routes
+
+// Suspend trader (deactivate)
+app.post('/api/admin/traders/:id/suspend', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const traderId = parseInt(req.params.id);
+    const { reason } = req.body; // Optional reason for suspension
+    
+    const updatedTrader = await storage.updateTrader(traderId, { 
+      status: 'suspended',
+      deactivationReason: reason || 'Suspended by admin'
+    });
+    
+    // Get trader user details for notification email
+    const traderUser = await storage.getUser(updatedTrader.userId);
+    
+    if (traderUser) {
+      try {
+        // Send suspension notification email
+        const suspensionEmail = {
+          from: process.env.FROM_EMAIL,
+          to: traderUser.email,
+          subject: `Account Suspended - ${updatedTrader.businessName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #dc3545 0%, #bd2130 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px;">⚠️ Account Suspended</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Important Notice</p>
+              </div>
+              
+              <div style="background: white; padding: 25px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                  Dear ${traderUser.firstName} ${traderUser.lastName},
+                </p>
+                
+                <p style="margin: 0 0 20px 0; color: #666; line-height: 1.6;">
+                  Your trader account for <strong>${updatedTrader.businessName}</strong> has been temporarily suspended by our admin team.
+                </p>
+                
+                ${reason ? `
+                  <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <h4 style="color: #721c24; margin: 0 0 10px 0;">Reason for Suspension:</h4>
+                    <p style="color: #721c24; margin: 0; line-height: 1.5;">${reason}</p>
+                  </div>
+                ` : ''}
+                
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <h4 style="color: #856404; margin: 0 0 10px 0;">What this means:</h4>
+                  <ul style="color: #856404; margin: 0; padding-left: 20px;">
+                    <li>Your trader portal is no longer accessible to customers</li>
+                    <li>Existing chat sessions may be affected</li>
+                    <li>Your subdomain (${updatedTrader.subdomain}.tradyfi.ng) is temporarily suspended</li>
+                  </ul>
+                </div>
+                
+                <div style="background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <h4 style="color: #0c5460; margin: 0 0 10px 0;">Next Steps:</h4>
+                  <p style="color: #0c5460; margin: 0; line-height: 1.5;">
+                    If you believe this suspension is in error or would like to appeal this decision, 
+                    please contact our support team at <a href="mailto:hey@tradyfi.ng" style="color: #007bff;">hey@tradyfi.ng</a> 
+                    with your account details and any relevant information.
+                  </p>
+                </div>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="mailto:hey@tradyfi.ng?subject=Account%20Suspension%20Appeal%20-%20${encodeURIComponent(updatedTrader.businessName)}" 
+                     style="display: inline-block; background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Contact Support
+                  </a>
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center;">
+                  <p style="margin: 0; color: #666; font-size: 13px;">
+                    This is an automated notification from Tradyfi.ng admin system.
+                  </p>
+                </div>
+              </div>
+            </div>
+          `
+        };
+
+        await emailTransporter.sendMail(suspensionEmail);
+        console.log('✅ Suspension notification email sent successfully');
+
+      } catch (emailError) {
+        console.error('❌ Failed to send suspension email:', emailError);
+        // Don't fail the suspension if email fails
+      }
+    }
+    
+    res.json({
+      ...updatedTrader,
+      message: "Trader suspended successfully"
+    });
+  } catch (error) {
+    console.error("Suspend trader error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Unsuspend trader (reactivate)
+app.post('/api/admin/traders/:id/unsuspend', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const traderId = parseInt(req.params.id);
+    
+    const updatedTrader = await storage.updateTrader(traderId, { 
+      status: 'verified', // Reactivate to verified status
+      deactivationReason: null // Clear suspension reason
+    });
+    
+    // Get trader user details for notification email
+    const traderUser = await storage.getUser(updatedTrader.userId);
+    
+    if (traderUser) {
+      try {
+        // Send reactivation notification email
+        const reactivationEmail = {
+          from: process.env.FROM_EMAIL,
+          to: traderUser.email,
+          subject: `Account Reactivated - ${updatedTrader.businessName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px;">✅ Account Reactivated</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Welcome Back!</p>
+              </div>
+              
+              <div style="background: white; padding: 25px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <p style="margin: 0 0 20px 0; font-size: 16px; color: #333;">
+                  Dear ${traderUser.firstName} ${traderUser.lastName},
+                </p>
+                
+                <p style="margin: 0 0 20px 0; color: #666; line-height: 1.6;">
+                  Great news! Your trader account for <strong>${updatedTrader.businessName}</strong> has been reactivated and is now fully operational.
+                </p>
+                
+                <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <h4 style="color: #155724; margin: 0 0 10px 0;">Your account is now active:</h4>
+                  <ul style="color: #155724; margin: 0; padding-left: 20px;">
+                    <li>Your trader portal is accessible to customers</li>
+                    <li>All trading features are restored</li>
+                    <li>Your subdomain (${updatedTrader.subdomain}.tradyfi.ng) is live</li>
+                    <li>Chat functionality is fully operational</li>
+                  </ul>
+                </div>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="https://tradyfi.ng/trader/dashboard" 
+                     style="display: inline-block; background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Access Your Dashboard
+                  </a>
+                </div>
+                
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                  <h4 style="color: #856404; margin: 0 0 10px 0;">Important Reminders:</h4>
+                  <p style="color: #856404; margin: 0; line-height: 1.5;">
+                    Please ensure you continue to follow our community guidelines and terms of service to maintain your account in good standing.
+                  </p>
+                </div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; text-align: center;">
+                  <p style="margin: 0; color: #666; font-size: 13px;">
+                    This is an automated notification from Tradyfi.ng admin system.
+                  </p>
+                </div>
+              </div>
+            </div>
+          `
+        };
+
+        await emailTransporter.sendMail(reactivationEmail);
+        console.log('✅ Reactivation notification email sent successfully');
+
+      } catch (emailError) {
+        console.error('❌ Failed to send reactivation email:', emailError);
+        // Don't fail the reactivation if email fails
+      }
+    }
+    
+    res.json({
+      ...updatedTrader,
+      message: "Trader reactivated successfully"
+    });
+  } catch (error) {
+    console.error("Unsuspend trader error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 
   // Resend OTP
   app.post('/api/auth/resend-otp', async (req, res) => {

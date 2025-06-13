@@ -532,6 +532,41 @@ async createTrader(trader: InsertTrader): Promise<Trader> {
     return trader;
   }
 
+  async getAdminStats() {
+  const allTraders = await this.getAllTraders();
+  const pendingTraders = allTraders.filter(t => t.status === 'verification_pending');
+  const approvedTraders = allTraders.filter(t => t.status === 'verified');
+  const rejectedTraders = allTraders.filter(t => t.status === 'rejected');
+  const suspendedTraders = allTraders.filter(t => t.status === 'suspended'); // Updated to use 'suspended'
+  
+  // Get subscription stats (if you have this method)
+  const subscriptionStats = await this.getSubscriptionStats();
+  
+  return {
+    totalTraders: allTraders.length,
+    pendingApprovals: pendingTraders.length,
+    approvedTraders: approvedTraders.length,
+    rejectedTraders: rejectedTraders.length,
+    suspendedTraders: suspendedTraders.length, // Updated to use 'suspended'
+    ...subscriptionStats
+  };
+}
+
+// Optional: Add helper methods for filtering traders by status
+async getActiveTraders(): Promise<Trader[]> {
+  return await db
+    .select()
+    .from(traders)
+    .where(eq(traders.status, 'verified'));
+}
+
+async getSuspendedTraders(): Promise<Trader[]> {
+  return await db
+    .select()
+    .from(traders)
+    .where(eq(traders.status, 'suspended'));
+}
+
 // Update the getPendingTraders method to include user data
 async getPendingTraders(): Promise<TraderWithUser[]> {
   const result = await db

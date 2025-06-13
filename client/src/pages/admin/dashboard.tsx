@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { adminApiRequest, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,7 +30,12 @@ import {
   Calendar,
   FileText,
   Download,
-  ExternalLink
+  ExternalLink,
+  Shield,
+  ShieldOff,
+  AlertTriangle,
+  Power,
+  PowerOff
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -36,13 +43,24 @@ export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
-  // Document viewer state - now properly typed
+  // Document viewer state
   const [documentDialog, setDocumentDialog] = useState<{
     isOpen: boolean;
     trader: TraderWithUser | null;
   }>({
     isOpen: false,
     trader: null
+  });
+
+  // Deactivation dialog state
+  const [deactivationDialog, setDeactivationDialog] = useState<{
+    isOpen: boolean;
+    trader: TraderWithUser | null;
+    reason: string;
+  }>({
+    isOpen: false,
+    trader: null,
+    reason: ''
   });
 
   // Check if user is admin
@@ -70,7 +88,7 @@ export default function AdminDashboard() {
     enabled: !!user && (user as any).role === 'admin',
   });
 
-  // Fetch pending traders - now properly typed
+  // Fetch pending traders
   const { data: pendingTraders = [], isLoading: pendingLoading } = useQuery<TraderWithUser[]>({
     queryKey: ['/api/admin/traders/pending'],
     queryFn: () => adminApiRequest('GET', '/api/admin/traders/pending'),
@@ -84,7 +102,7 @@ export default function AdminDashboard() {
     enabled: !!user && (user as any).role === 'admin',
   });
 
-  // Fetch all traders - now properly typed
+  // Fetch all traders
   const { data: allTraders = [], isLoading: tradersLoading } = useQuery<TraderWithUser[]>({
     queryKey: ['/api/admin/traders'],
     queryFn: () => adminApiRequest('GET', '/api/admin/traders'),
@@ -137,6 +155,51 @@ export default function AdminDashboard() {
     },
   });
 
+  // Suspend trader mutation (instead of deactivate)
+  const suspendMutation = useMutation({
+    mutationFn: async ({ traderId, reason }: { traderId: number; reason: string }) => {
+      return await adminApiRequest("POST", `/api/admin/traders/${traderId}/suspend`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/traders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      setDeactivationDialog({ isOpen: false, trader: null, reason: '' });
+      toast({
+        title: "Trader Suspended",
+        description: "Trader has been successfully suspended",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Suspension Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Unsuspend trader mutation (instead of activate)
+  const unsuspendMutation = useMutation({
+    mutationFn: async (traderId: number) => {
+      return await adminApiRequest("POST", `/api/admin/traders/${traderId}/unsuspend`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/traders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+      toast({
+        title: "Trader Unsuspended",
+        description: "Trader has been successfully reactivated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Unsuspension Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -170,11 +233,15 @@ export default function AdminDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'verified':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Verified</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
       case 'verification_pending':
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>;
       case 'rejected':
         return <Badge className="bg-red-100 text-red-800 border-red-200">Rejected</Badge>;
+      case 'suspended':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Suspended</Badge>;
+      case 'unverified':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Unverified</Badge>;
       default:
         return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Unknown</Badge>;
     }
@@ -200,6 +267,23 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleDeactivateTrader = (trader: TraderWithUser) => {
+    setDeactivationDialog({
+      isOpen: true,
+      trader,
+      reason: ''
+    });
+  };
+
+  const handleConfirmDeactivation = () => {
+    if (deactivationDialog.trader) {
+      suspendMutation.mutate({
+        traderId: deactivationDialog.trader.id,
+        reason: deactivationDialog.reason
+      });
+    }
+  };
+
   const handleDownloadDocument = (documentUrl: string, traderName: string) => {
     const link = document.createElement('a');
     link.href = documentUrl;
@@ -214,7 +298,7 @@ export default function AdminDashboard() {
     return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
   };
 
-  // Document viewer component - now properly typed
+  // Document viewer component
   const DocumentViewer = ({ trader }: { trader: TraderWithUser }) => {
     if (!trader?.documentUrl) {
       return (
@@ -276,7 +360,7 @@ export default function AdminDashboard() {
     );
   };
 
-  // Trader card component with document viewing - now properly typed
+  // Trader card component with all actions
   const TraderCard = ({ trader, showActions = false }: { trader: TraderWithUser; showActions?: boolean }) => (
     <div key={trader.id} className="border rounded-lg p-4 bg-white">
       <div className="flex items-center justify-between">
@@ -311,6 +395,12 @@ export default function AdminDashboard() {
             <div className="mt-2">
               <strong className="text-sm">Description:</strong>
               <p className="text-sm text-gray-600">{trader.profileDescription}</p>
+            </div>
+          )}
+          {trader.status === 'suspended' && (trader as any).deactivationReason && (
+            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+              <strong className="text-sm text-orange-800">Suspension Reason:</strong>
+              <p className="text-sm text-orange-700">{(trader as any).deactivationReason}</p>
             </div>
           )}
         </div>
@@ -351,6 +441,32 @@ export default function AdminDashboard() {
               </Button>
             </>
           )}
+
+          {/* Suspend/Unsuspend buttons for verified traders */}
+          {trader.status === 'verified' && (
+            <Button
+              onClick={() => handleDeactivateTrader(trader)}
+              disabled={suspendMutation.isPending}
+              variant="outline"
+              size="sm"
+              className="text-orange-600 border-orange-300 hover:bg-orange-50"
+            >
+              <PowerOff className="h-4 w-4 mr-1" />
+              Suspend
+            </Button>
+          )}
+
+          {trader.status === 'suspended' && (
+            <Button
+              onClick={() => unsuspendMutation.mutate(trader.id)}
+              disabled={unsuspendMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              size="sm"
+            >
+              <Power className="h-4 w-4 mr-1" />
+              Unsuspend
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -387,7 +503,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -421,9 +537,23 @@ export default function AdminDashboard() {
               <div className="flex items-center">
                 <UserCheck className="h-8 w-8 text-green-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Approved Traders</p>
+                  <p className="text-sm font-medium text-gray-600">Active Traders</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {isLoading ? "..." : (adminStats as any)?.approvedTraders || 0}
+                    {isLoading ? "..." : allTraders.filter(t => t.status === 'verified').length || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Shield className="h-8 w-8 text-orange-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Suspended</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {isLoading ? "..." : allTraders.filter(t => t.status === 'suspended').length || 0}
                   </p>
                 </div>
               </div>
@@ -507,7 +637,7 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Subscriptions & Revenue Tab - Keep existing content */}
+          {/* Subscriptions & Revenue Tab */}
           <TabsContent value="subscriptions" className="space-y-6">
             {/* Revenue Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -659,6 +789,72 @@ export default function AdminDashboard() {
             <DialogTitle>Document Verification</DialogTitle>
           </DialogHeader>
           {documentDialog.trader && <DocumentViewer trader={documentDialog.trader} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspension Confirmation Dialog */}
+      <Dialog 
+        open={deactivationDialog.isOpen} 
+        onOpenChange={(open) => setDeactivationDialog({ isOpen: open, trader: null, reason: '' })}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Suspend Trader
+            </DialogTitle>
+          </DialogHeader>
+          
+          {deactivationDialog.trader && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Are you sure you want to suspend <strong>{deactivationDialog.trader.businessName}</strong>? 
+                This will suspend their trader portal and prevent customers from accessing their services.
+              </p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="deactivation-reason">Reason for suspension (optional)</Label>
+                <Textarea
+                  id="deactivation-reason"
+                  placeholder="Enter reason for suspension..."
+                  value={deactivationDialog.reason}
+                  onChange={(e) => setDeactivationDialog(prev => ({ ...prev, reason: e.target.value }))}
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-gray-500">
+                  This reason will be sent to the trader via email notification.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeactivationDialog({ isOpen: false, trader: null, reason: '' })}
+              disabled={suspendMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDeactivation}
+              disabled={suspendMutation.isPending}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {suspendMutation.isPending ? (
+                <>
+                  <PowerOff className="h-4 w-4 mr-2 animate-spin" />
+                  Suspending...
+                </>
+              ) : (
+                <>
+                  <PowerOff className="h-4 w-4 mr-2" />
+                  Suspend Trader
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
