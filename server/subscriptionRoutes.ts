@@ -537,4 +537,224 @@ app.post('/api/subscription/verify-payment', authenticate, async (req: AuthReque
       res.status(200).send('OK'); // Still acknowledge to prevent retries
     }
   });
+
+  app.post('/api/subscription/cancel', authenticate, async (req, res) => {
+  try {
+    console.log(`Cancelling subscription for trader: ${req.user.id}`);
+    
+    // Get current subscription
+    const subscription = await storage.getTraderSubscription(req.user.id);
+    
+    if (!subscription) {
+      return res.status(404).json({ message: 'No active subscription found' });
+    }
+    
+    // Check if subscription can be cancelled
+    if (!['active', 'trial'].includes(subscription.status)) {
+      return res.status(400).json({ 
+        message: `Cannot cancel subscription with status: ${subscription.status}` 
+      });
+    }
+    
+    // If it's a Paystack subscription, cancel it there too
+    if (subscription.paystackSubscriptionCode && subscription.status === 'active') {
+      try {
+        const paystack = require('paystack')(process.env.PAYSTACK_SECRET_KEY);
+        
+        // Disable the subscription on Paystack
+        await paystack.subscription.disable({
+          code: subscription.paystackSubscriptionCode,
+          token: subscription.paystackSubscriptionCode
+        });
+        
+        console.log('✅ Paystack subscription cancelled:', subscription.paystackSubscriptionCode);
+      } catch (paystackError) {
+        console.error('❌ Error cancelling Paystack subscription:', paystackError);
+        // Continue with local cancellation even if Paystack fails
+        // This ensures user can still cancel even if Paystack API is down
+      }
+    }
+    
+    // Cancel the subscription locally
+    const cancelledSubscription = await storage.cancelTraderSubscription(subscription.id);
+    
+    console.log(`✅ Subscription cancelled for trader: ${req.user.id}`);
+    
+    res.json({ 
+      status: true, 
+      message: 'Subscription cancelled successfully. You will retain access until your current billing period ends.',
+      subscription: cancelledSubscription
+    });
+  } catch (error) {
+    console.error('❌ Error cancelling subscription:', error);
+    res.status(500).json({ message: 'Failed to cancel subscription' });
+  }
+});
+
+// Reactivate subscription
+app.post('/api/subscription/reactivate', authenticate, async (req, res) => {
+  try {
+    console.log(`Reactivating subscription for trader: ${req.user.id}`);
+    
+    // Get current subscription
+    const subscription = await storage.getTraderSubscription(req.user.id);
+    
+    if (!subscription) {
+      return res.status(404).json({ message: 'No subscription found' });
+    }
+    
+    // Check if subscription can be reactivated
+    if (subscription.status !== 'cancelled') {
+      return res.status(400).json({ 
+        message: `Cannot reactivate subscription with status: ${subscription.status}` 
+      });
+    }
+    
+    // Check if subscription hasn't expired yet
+    if (subscription.endDate && new Date() > new Date(subscription.endDate)) {
+      return res.status(400).json({ 
+        message: 'Cannot reactivate expired subscription. Please purchase a new subscription.' 
+      });
+    }
+    
+    // Try to reactivate on Paystack if it was a paid subscription
+    if (subscription.paystackSubscriptionCode) {
+      try {
+        const paystack = require('paystack')(process.env.PAYSTACK_SECRET_KEY);
+        
+        // Enable the subscription on Paystack
+        await paystack.subscription.enable({
+          code: subscription.paystackSubscriptionCode,
+          token: subscription.paystackSubscriptionCode
+        });
+        
+        console.log('✅ Paystack subscription reactivated:', subscription.paystackSubscriptionCode);
+      } catch (paystackError) {
+        console.error('❌ Error reactivating Paystack subscription:', paystackError);
+        // Continue with local reactivation - they might need to set up payment again
+      }
+    }
+    
+    // Reactivate the subscription locally
+    const reactivatedSubscription = await storage.reactivateTraderSubscription(subscription.id);
+    
+    console.log(`✅ Subscription reactivated for trader: ${req.user.id}`);
+    
+    res.json({ 
+      status: true, 
+      message: 'Subscription reactivated successfully. Auto-renewal has been enabled.',
+      subscription: reactivatedSubscription
+    });
+  } catch (error) {
+    console.error('❌ Error reactivating subscription:', error);
+    res.status(500).json({ message: 'Failed to reactivate subscription' });
+  }
+});
+
+// Get cancellation details
+app.get('/api/subscription/cancellation-details', authenticate, async (req, res) => {
+  try {
+    const details = await storage.getSubscriptionCancellationDetails(req.user.id);
+    res.json(details);
+  } catch (error) {
+    console.error('Error getting cancellation details:', error);
+    res.status(500).json({ message: 'Failed to get cancellation details' });
+  }
+});
+
+// Get subscription status (useful for frontend checks)
+app.get('/status', authenticate, async (req, res) => {
+  try {
+    const subscription = await storage.getTraderSubscriptionWithPlan(req.user.id);
+    
+    if (!subscription) {
+      return res.json({
+        hasSubscription: false,
+        hasAccess: false,
+        status: 'none'
+      });
+    }
+    
+    const daysLeft = subscription.endDate 
+      ? Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    
+    const hasAccess = ['active', 'trial'].includes(subscription.status) && daysLeft > 0;
+    
+    res.json({
+      hasSubscription: true,
+      hasAccess,
+      status: subscription.status,
+      daysLeft,
+      plan: subscription.plan,
+      canCancel: ['active', 'trial'].includes(subscription.status),
+      canReactivate: subscription.status === 'cancelled' && daysLeft > 0
+    });
+  } catch (error) {
+    console.error('Error getting subscription status:', error);
+    res.status(500).json({ message: 'Failed to get subscription status' });
+  }
+});
+
+// ===== ADMIN ROUTES (Optional) =====
+
+// Admin route: Get all subscriptions
+app.get('/admin/all-subscriptions', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    
+    const subscriptions = await storage.getAllSubscriptionStatuses();
+    res.json(subscriptions);
+  } catch (error) {
+    console.error('Error fetching all subscriptions:', error);
+    res.status(500).json({ message: 'Failed to fetch subscriptions' });
+  }
+});
+
+// Admin route: Force cancel subscription
+app.post('/admin/force-cancel/:userId', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    
+    const { userId } = req.params;
+    const { reason } = req.body;
+    
+    const subscription = await storage.getTraderSubscription(userId);
+    
+    if (!subscription) {
+      return res.status(404).json({ message: 'No subscription found for user' });
+    }
+    
+    // Force cancel the subscription
+    const cancelledSubscription = await storage.cancelTraderSubscription(subscription.id);
+    
+    // Log admin action
+    console.log(`🛡️ Admin ${req.user.email} force-cancelled subscription for user ${userId}. Reason: ${reason || 'No reason provided'}`);
+    
+    res.json({ 
+      status: true, 
+      message: 'Subscription force-cancelled successfully',
+      subscription: cancelledSubscription
+    });
+  } catch (error) {
+    console.error('Error force-cancelling subscription:', error);
+    res.status(500).json({ message: 'Failed to force-cancel subscription' });
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'subscription-service',
+    version: '2.0.0'
+  });
+});
 }

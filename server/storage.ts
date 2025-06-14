@@ -127,6 +127,16 @@ export interface IStorage {
   // Notification preferences
   getNotificationPreferences(userId: string): Promise<NotificationPreference>;
   updateNotificationPreferences(userId: string, preferences: Partial<InsertNotificationPreference>): Promise<NotificationPreference>;
+  cancelTraderSubscription(subscriptionId: number): Promise<UserSubscription>;
+reactivateTraderSubscription(subscriptionId: number): Promise<UserSubscription>;
+canCancelSubscription(userId: string): Promise<boolean>;
+getSubscriptionCancellationDetails(userId: string): Promise<{
+  canCancel: boolean;
+  daysRemaining: number;
+  willExpireOn: Date | null;
+  subscriptionId: number | null;
+}>;
+
   
 }
 
@@ -549,6 +559,70 @@ async createTrader(trader: InsertTrader): Promise<Trader> {
     rejectedTraders: rejectedTraders.length,
     suspendedTraders: suspendedTraders.length, // Updated to use 'suspended'
     ...subscriptionStats
+  };
+}
+
+async cancelTraderSubscription(subscriptionId: number): Promise<UserSubscription> {
+  const [subscription] = await db
+    .update(userSubscriptions)
+    .set({ 
+      status: 'cancelled',
+      autoRenew: false,
+      updatedAt: new Date() 
+    })
+    .where(eq(userSubscriptions.id, subscriptionId))
+    .returning();
+  return subscription;
+}
+
+// Reactivate subscription
+async reactivateTraderSubscription(subscriptionId: number): Promise<UserSubscription> {
+  const [subscription] = await db
+    .update(userSubscriptions)
+    .set({ 
+      status: 'active',
+      autoRenew: true,
+      updatedAt: new Date() 
+    })
+    .where(eq(userSubscriptions.id, subscriptionId))
+    .returning();
+  return subscription;
+}
+
+// Check if subscription can be cancelled (not already cancelled/expired)
+async canCancelSubscription(userId: string): Promise<boolean> {
+  const subscription = await this.getTraderSubscription(userId);
+  return subscription && ['active', 'trial'].includes(subscription.status);
+}
+
+// Get subscription cancellation details (days remaining, etc.)
+async getSubscriptionCancellationDetails(userId: string): Promise<{
+  canCancel: boolean;
+  daysRemaining: number;
+  willExpireOn: Date | null;
+  subscriptionId: number | null;
+}> {
+  const subscription = await this.getTraderSubscription(userId);
+  
+  if (!subscription) {
+    return {
+      canCancel: false,
+      daysRemaining: 0,
+      willExpireOn: null,
+      subscriptionId: null
+    };
+  }
+  
+  const canCancel = ['active', 'trial'].includes(subscription.status);
+  const daysRemaining = subscription.endDate 
+    ? Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  
+  return {
+    canCancel,
+    daysRemaining,
+    willExpireOn: subscription.endDate,
+    subscriptionId: subscription.id
   };
 }
 
