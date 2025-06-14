@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shield, Eye, Lock, Users, MessageCircle, Globe, ArrowLeft } from "lucide-react";
 import Footer from "@/components/footer";
+import Logo from "@/components/logo";
 
 export default function PrivacyPolicy() {
   const handleGoBack = () => {
@@ -28,7 +29,7 @@ export default function PrivacyPolicy() {
                 Back
               </Button>
               <div className="flex items-center">
-                <img className="text-white text-lg" src="/logo.png" alt="Tradyfi.ng" />
+               <Logo/>
               </div>
             </div>
             <Button onClick={handleGoHome}>

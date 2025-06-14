@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AuthModal } from "@/components/auth/auth-modal";
 import { Link } from "wouter";
 import Footer from "@/components/footer";
+import Logo from "@/components/logo";
 
 export default function Landing() {
 
@@ -16,14 +17,13 @@ export default function Landing() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="flex items-center">
-                  <img className="text-white text-lg" src="/logo.png" />
+                  <Logo/>
                   {/* <span className="ml-3 text-xl font-bold text-slate-900">Tradyfi.ng</span> */}
                 </div>
               </div>
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
                 <a href="#features" className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors">Features</a>
-                <a href="#how-it-works" className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors">How It Works</a>
-                <a href="#support" className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors">Support</a>
+                <a href="/contact" className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors">Contact Us</a>
               </nav>
             </div>
             <div className="flex items-center space-x-4">

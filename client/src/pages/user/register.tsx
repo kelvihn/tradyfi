@@ -269,7 +269,6 @@ export default function UserRegister() {
                 <li>• We'll send a 6-digit verification code to your email</li>
                 <li>• Enter the code to verify your email address</li>
                 <li>• Your account will be created after successful verification</li>
-                <li>• You can then start trading immediately</li>
               </ul>
             </div>
           </CardContent>

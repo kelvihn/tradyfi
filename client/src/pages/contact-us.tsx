@@ -17,6 +17,7 @@ import {
   Shield
 } from "lucide-react";
 import Footer from "@/components/footer";
+import Logo from "@/components/logo";
 
 interface ContactFormData {
   title: string;
@@ -130,7 +131,7 @@ export default function ContactUs() {
                 Back
               </Button>
               <div className="flex items-center">
-                <img className="text-white text-lg" src="/logo.png" alt="Tradyfi.ng" />
+                <Logo/>
               </div>
             </div>
             <Button onClick={handleGoHome}>

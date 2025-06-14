@@ -1766,7 +1766,7 @@ app.post('/api/contact', async (req, res) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <img src="https://tradyfi.ng/logo.png" alt="Tradyfi.ng" style="height: 40px;" />
+            <img src="https://tradyfi.ng/logo.svg" alt="Tradyfi.ng" style="height: 40px;" />
           </div>
           
           <h2 style="color: #333; text-align: center;">Thank You for Contacting Us!</h2>

@@ -1,6 +1,7 @@
 // src/components/Footer.tsx
 import { Shield } from "lucide-react";
 import React from "react";
+import Logo from "./logo";
 
 const Footer = () => {
   return (
@@ -8,7 +9,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-1">
-            <img className="text-white text-lg" src="/logo.png" alt="Tradyfi logo" />
+            <Logo/>
             <p className="text-slate-400 mb-4">
               Professional crypto trading platform connecting independent traders with users through personalized portals.
             </p>

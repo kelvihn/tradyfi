@@ -6,6 +6,7 @@ import { ChartLine, Users, MessageCircle, Settings, LogOut, AlertCircle, Clock, 
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import Footer from "@/components/footer";
+import Logo from "@/components/logo";
 
 export default function Home() {
   const { user } = useAuth();
@@ -58,7 +59,7 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-           <img className="text-white text-lg" src="/logo.png"/>
+          <Logo/>
             <div className="flex items-center space-x-4">
               {/* <span className="text-slate-600">Welcome, {user?.firstName || user?.email}</span> */}
               <Button variant="ghost" onClick={logout} className="text-slate-600">

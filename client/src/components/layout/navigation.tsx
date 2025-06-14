@@ -79,16 +79,10 @@ export function Navigation({
             Features
           </a>
           <a 
-            href="#how-it-works" 
+            href="/contact" 
             className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
           >
-            How It Works
-          </a>
-          <a 
-            href="#support" 
-            className="text-slate-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
-          >
-            Support
+            Contact Us
           </a>
         </>
       )}
