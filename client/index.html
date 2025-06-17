@@ -2,9 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1"
+    />
+    
+    <link rel="icon" href="/favicon.png" type="image/x-icon" />
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+
     <!-- Meta Pixel Code -->
-      <script>
+    <script>
       !function(f,b,e,v,n,t,s)
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
       n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -15,18 +22,17 @@
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '660294092299578');
       fbq('track', 'PageView');
-      </script>
-      <noscript><img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=660294092299578&ev=PageView&noscript=1"
-      /></noscript>
-      <!-- End Meta Pixel Code -->
-    <link rel="icon" href="/favicon.png" type="image/x-icon" />
-    <script src="https://js.paystack.co/v1/inline.js"></script>
+    </script>
+    <noscript>
+      <img height="1" width="1" style="display:none"
+        src="https://www.facebook.com/tr?id=660294092299578&ev=PageView&noscript=1" />
+    </noscript>
+    <!-- End Meta Pixel Code -->
+
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
     <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
   </body>
 </html>
