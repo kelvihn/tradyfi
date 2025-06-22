@@ -78,12 +78,13 @@ export default function Login() {
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
-      const response = await apiRequest("POST", "/api/login", data);
-      return response.json();
-    },
-    onSuccess: async (data) => {
+ // Updated loginMutation in login.tsx
+const loginMutation = useMutation({
+  mutationFn: async (data: LoginForm) => {
+    const response = await apiRequest("POST", "/api/login", data);
+    return response.json();
+  },
+  onSuccess: async (data) => {
     console.log('🔑 Login successful, token received');
     localStorage.setItem('token', data.token);
 
@@ -100,14 +101,19 @@ export default function Login() {
         description: "Welcome back!",
       });
 
+      // Wait for React to re-render with new state
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      if (data.user?.role === 'trader') {
-        console.log('🚀 Redirecting trader to dashboard...');
+      // Role-based navigation
+      const userRole = data.user?.role;
+      
+      if (userRole === 'trader') {
+        console.log('🚀 Navigating to trader dashboard...');
         navigate("/trader/dashboard", { replace: true });
       } else {
-        console.log('🚀 Redirecting user to discover page...');
-        navigate("/discover", { replace: true });
+        // For regular users or fallback
+        console.log('🚀 Navigating to home...');
+        navigate("/home", { replace: true });
       }
       
     } catch (error) {
@@ -115,21 +121,21 @@ export default function Login() {
       navigate("/", { replace: true });
     }
   },
-    onError: (error: Error) => {
-      // Check if it's an unverified email error
-      if (error.message.includes('Email not verified') || error.message.includes('EMAIL_NOT_VERIFIED')) {
-        setUnverifiedEmail(form.getValues('email'));
-        setShowVerificationAlert(true);
-        return;
-      }
+  onError: (error: Error) => {
+    // Check if it's an unverified email error
+    if (error.message.includes('Email not verified') || error.message.includes('EMAIL_NOT_VERIFIED')) {
+      setUnverifiedEmail(form.getValues('email'));
+      setShowVerificationAlert(true);
+      return;
+    }
 
-      toast({
-        title: "Login failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+    toast({
+      title: "Login failed",
+      description: error.message,
+      variant: "destructive",
+    });
+  },
+});
 
   const handleVerifyEmail = () => {
     if (unverifiedEmail) {

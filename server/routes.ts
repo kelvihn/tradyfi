@@ -324,72 +324,117 @@ app.post('/api/register', async (req, res) => {
 });
 
   // Login route
-  app.post('/api/login', async (req, res) => {
-    try {
-      const { email, password } = req.body;
+// Updated login route in routes.ts
+app.post('/api/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      const user = await storage.getUserByEmail(email);
-
-      console.log("user is @@@:", user);
-
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      const isValid = await comparePassword(password, user.password);
-      if (!isValid) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      const token = await generateToken(user.id);
-
-      console.log("token generated: ", token);
-      
-      // Set cookie for browser and return token for API
-      res.cookie('token', token, { 
-        httpOnly: true, 
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
-
-      res.json({ 
-        message: "Login successful", 
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName
-        }
-      });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Login failed" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
     }
-  });
 
-  // Get current user
-  app.get('/api/auth/user', authenticate, async (req: AuthRequest, res) => {
-    try {
-      const user = req.user!;
-      
-      // Check if user is a trader
+    const user = await storage.getUserByEmail(email);
+
+    console.log("user is @@@:", user);
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isValid = await comparePassword(password, user.password);
+    if (!isValid) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = await generateToken(user.id);
+
+    console.log("token generated: ", token);
+    
+    // Set cookie for browser and return token for API
+    res.cookie('token', token, { 
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Build response with role information
+    const responseData = {
+      message: "Login successful", 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role // Include role in response
+      }
+    };
+
+    // If user is a trader, include trader-specific information
+    if (user.role === 'trader') {
       const trader = await storage.getTraderByUserId(user.id);
       
-      res.json({
-        ...user,
-        trader: trader || null
-      });
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      if (trader) {
+        responseData.user.trader = {
+          id: trader.id,
+          businessName: trader.businessName,
+          subdomain: trader.subdomain,
+          status: trader.status,
+          profileDescription: trader.profileDescription
+        };
+      }
     }
-  });
 
+    res.json(responseData);
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Login failed" });
+  }
+});
+
+  // Get current user
+// Updated /api/auth/user route in routes.ts
+app.get('/api/auth/user', authenticate, async (req: AuthRequest, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const baseUserData = {
+      id: req.user.id,
+      email: req.user.email,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+      role: req.user.role
+    };
+
+    // If user is a trader, include trader information
+    if (req.user.role === 'trader') {
+      const trader = await storage.getTraderByUserId(req.user.id);
+      
+      if (trader) {
+        res.json({
+          ...baseUserData,
+          trader: {
+            id: trader.id,
+            businessName: trader.businessName,
+            subdomain: trader.subdomain,
+            status: trader.status,
+            profileDescription: trader.profileDescription,
+            contactInfo: trader.contactInfo
+          }
+        });
+      } else {
+        res.json(baseUserData);
+      }
+    } else {
+      res.json(baseUserData);
+    }
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
   // Logout routes (support both GET and POST)
   app.post('/api/logout', (req, res) => {
     res.clearCookie('token');

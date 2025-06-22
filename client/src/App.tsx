@@ -176,31 +176,56 @@ function UserChatRoute({ roomId, subdomain }: { roomId: string; subdomain: strin
   );
 }
 
+// Updated TraderRedirect function in App.tsx
 function TraderRedirect() {
   const { user, isLoading: authLoading } = useAuth();
   const { data: traderStatus, isLoading: traderLoading } = useQuery({
     queryKey: ["/api/trader/status"],
     retry: false,
-    enabled: !!user && !authLoading,
+    enabled: !!user && !authLoading && user.role === 'trader', // Only fetch if user is a trader
   });
 
   console.log('🏠 TraderRedirect render');
   console.log('👤 Auth user:', user);
+  console.log('👤 User role:', user?.role);
   console.log('⏳ Auth loading:', authLoading);
   console.log('⏳ Trader loading:', traderLoading);
   console.log('📊 Trader status:', traderStatus);
 
-  if (authLoading || traderLoading) {
-    console.log('⏳ Still loading...');
+  if (authLoading) {
+    console.log('⏳ Auth still loading...');
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  if (user && traderStatus?.status === 'verified') {
-    console.log('✅ Showing TraderDashboard');
-    return <TraderDashboard />;
+  if (!user) {
+    console.log('❌ No user found, showing Landing');
+    return <Landing />;
   }
 
-  console.log('🏠 Showing Home page');
+  // Role-based routing
+  if (user.role === 'admin') {
+    console.log('🔀 Admin detected, redirecting to admin panel');
+    window.location.href = '/admin';
+    return <div className="min-h-screen flex items-center justify-center">Redirecting...</div>;
+  }
+
+  if (user.role === 'trader') {
+    if (traderLoading) {
+      console.log('⏳ Trader data still loading...');
+      return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    }
+
+    if (traderStatus?.status === 'verified') {
+      console.log('✅ Verified trader, showing TraderDashboard');
+      return <TraderDashboard />;
+    }
+
+    console.log('🏠 Trader not verified, showing Home page');
+    return <Home />;
+  }
+
+  // Regular user or fallback
+  console.log('🏠 Regular user, showing Home page');
   return <Home />;
 }
 
