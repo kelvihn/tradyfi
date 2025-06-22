@@ -70,28 +70,46 @@ app.get('/api/firebase-config', (req, res) => {
     }
   });
 
-  //user login route
+// Update the /api/user/login route in server/routes.ts
+
 app.post('/api/user/login', async (req, res) => {
   try {
     const { email, password, subdomain } = req.body;
 
-     console.log("user is request", req.body);
+    console.log("User login request:", req.body);
 
     if (!email || !password || !subdomain) {
       return res.status(400).json({ message: "Email, password, and subdomain are required" });
     }
 
-    // Custom function that performs the correct JOIN across tables
-    const user = await storage.getUserByEmailAndSubdomain(email, subdomain);
+    // Verify trader exists and is active
+    const trader = await storage.getTraderBySubdomain(subdomain);
+    if (!trader) {
+      return res.status(404).json({ message: "Trader portal not found" });
+    }
 
-    if (!user || user.role !== 'user') {
+    if (trader.status !== 'verified') {
+      return res.status(403).json({ message: "Trader portal is not active" });
+    }
+
+    // Find user by email (NEW: No trader dependency)
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const isValidPassword =  await comparePassword(password, user.password);
-
+    // Verify password
+    const isValidPassword = await comparePassword(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // OPTIONAL: Create analytics tracking for first interaction
+    try {
+      await storage.getOrCreatePortalUser(user.id, trader.id);
+    } catch (analyticsError) {
+      console.error('Analytics tracking failed:', analyticsError);
+      // Don't fail login if analytics fail
     }
 
     const token = await generateToken(user.id);
@@ -104,8 +122,8 @@ app.post('/api/user/login', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        subdomain: user.subdomain,
-        traderId: user.traderId, 
+        subdomain: trader.subdomain,
+        traderId: trader.id, 
       }
     });
 
