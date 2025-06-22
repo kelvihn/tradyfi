@@ -40,7 +40,7 @@ export default function Landing() {
               /> */}
               <Link href="/register">
                 <Button className="btn-primary">
-                  Register as Trader
+                  Signup
                 </Button>
               </Link>
             </div>
@@ -69,7 +69,7 @@ export default function Landing() {
                       size="lg"
                       className="btn-primary text-lg px-8 py-4"
                     >
-                      Register as Trader
+                    Signup
                     </Button>
                   </Link>
                   <Link href="/login">

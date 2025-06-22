@@ -104,7 +104,7 @@ export default function TraderProfile() {
               You don't have a trader profile yet.
             </p>
             <Button onClick={() => window.location.href = "/trader/register"}>
-              Register as Trader
+              Signup
             </Button>
           </CardContent>
         </Card>

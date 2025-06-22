@@ -33,6 +33,7 @@ import VerifyResetOTP from "@/pages/verify-reset-otp";
 import ResetPassword from "@/pages/reset-password";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import ContactUs from "@/pages/contact-us";
+import DiscoverTraders from "@/pages/discover-trader";
 
 // Import chat components
 import { ChatInterface } from "@/components/chat/chat-interface";
@@ -315,6 +316,8 @@ function Router() {
       <Route path="/trader/chat/:roomId">
         {(params) => <TraderChatRoute roomId={params.roomId} />}
       </Route>
+
+      <Route path="/discover" component={DiscoverTraders} />
       
       {/* General authenticated routes */}
       {isAuthenticated && (

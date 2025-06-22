@@ -146,10 +146,15 @@ export const traders = pgTable("traders", {
 });
 
 // Portal users (users who register on trader portals)
+// shared/schema.ts - Update portalUsers table
 export const portalUsers = pgTable("portal_users", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   traderId: integer("trader_id").notNull().references(() => traders.id),
+  firstInteractionDate: timestamp("first_interaction_date").defaultNow(),
+  lastInteractionDate: timestamp("last_interaction_date").defaultNow(), 
+  interactionCount: integer("interaction_count").default(1),
+  preferences: jsonb("preferences").default('{}'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

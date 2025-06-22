@@ -227,33 +227,35 @@ app.post('/api/user/register', async (req, res) => {
   });
 
   // Registration route
-  app.post('/api/register', async (req, res) => {
-    try {
-      const { firstName, lastName, email, password } = req.body;
+// server/routes.ts - Update main registration to support user type selection
+app.post('/api/register', async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, userType = 'user' } = req.body;
 
-      if (!firstName || !lastName || !email || !password) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
+    if (!firstName || !lastName || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
 
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists with this email" });
-      }
+    // Check if user already exists
+    const existingUser = await storage.getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists with this email" });
+    }
 
-      // Hash password and create user
-      const hashedPassword = await hashPassword(password);
-      const user = await storage.createUser({
-        id: nanoid(),
-        email,
-        firstName,
-        lastName,
-        emailVerified: true,
-        password: hashedPassword,
-        role: "trader" as const,
-      });
+    // Hash password and create user
+    const hashedPassword = await hashPassword(password);
+    const user = await storage.createUser({
+      id: nanoid(),
+      email,
+      firstName,
+      lastName,
+      emailVerified: true,
+      password: hashedPassword,
+      role: userType === 'trader' ? 'trader' : 'user',
+    });
 
-      // Automatically create trader profile with unverified status
+    // Only create trader profile if user selected "trader"
+    if (userType === 'trader') {
       await storage.createTrader({
         userId: user.id,
         businessName: `${firstName} ${lastName}`,
@@ -266,19 +268,42 @@ app.post('/api/user/register', async (req, res) => {
       try {
         await sendWelcomeEmail(emailTransporter, 'traderWelcome', email, {
           firstName,
-          lastName
+          lastName,
+          nextStep: 'Complete your trader profile to get started'
         });
       } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError);
-        // Don't fail the registration if email fails
+        console.error('Failed to send trader welcome email:', emailError);
       }
-
-      res.status(201).json({ message: "User created successfully", userId: user.id });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
+    } else {
+      try {
+        await sendWelcomeEmail(emailTransporter, 'userWelcome', email, {
+          firstName,
+          lastName,
+          nextStep: 'Explore our verified traders and start trading'
+        });
+      } catch (emailError) {
+        console.error('Failed to send user welcome email:', emailError);
+      }
     }
-  });
+
+    // Generate token
+    const token = await generateToken(user.id);
+
+    res.json({ 
+      message: "Registration successful", 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      },
+      nextStep: userType === 'trader' ? 'complete_trader_profile' : 'explore_platform'
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Registration failed" });
+  }
+});
 
   // Login route
   app.post('/api/login', async (req, res) => {
@@ -1050,95 +1075,50 @@ app.post('/api/admin/traders/:id/approve', authenticate, async (req: AuthRequest
   }
 });
 
-  app.get('/api/trader/:subdomain/auth', authenticate, async (req: AuthRequest, res) => {
+app.get('/api/trader/:subdomain/auth', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { subdomain } = req.params;
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const trader = await storage.getTraderBySubdomain(subdomain);
+    if (!trader) {
+      return res.status(404).json({ message: 'Trader not found' });
+    }
+    
+    // REMOVE portalUser dependency - allow any authenticated user
+    // Optional: Track interaction for analytics
     try {
-      const { subdomain } = req.params;
-      const userId = req.user?.id;
-      
-      if (!userId) {
-        return res.status(401).json({ message: 'Unauthorized' });
-      }
-      
-      const trader = await storage.getTraderBySubdomain(subdomain);
-      if (!trader) {
-        return res.status(404).json({ message: 'Trader not found' });
-      }
-      
-      const portalUser = await storage.getPortalUserByUserAndTrader(userId, trader.id);
-      if (!portalUser) {
-        return res.status(401).json({ message: 'Not registered with this trader' });
-      }
-      
+      const portalUser = await storage.getOrCreatePortalUser(userId, trader.id);
       res.json({
         userId: portalUser.userId,
         traderId: portalUser.traderId,
-        status: portalUser.status,
-        registeredAt: portalUser.createdAt
+        registeredAt: portalUser.createdAt,
+        interactionCount: portalUser.interactionCount
       });
     } catch (error) {
-      console.error('Error checking trader auth:', error);
-      res.status(500).json({ message: 'Failed to check authentication' });
+      // If analytics fail, still allow access
+      console.error('Analytics error:', error);
+      res.json({
+        userId,
+        traderId: trader.id,
+        registeredAt: new Date(),
+        interactionCount: 1
+      });
     }
-  });
+  } catch (error) {
+    console.error('Error checking trader auth:', error);
+    res.status(500).json({ message: 'Failed to check authentication' });
+  }
+});
 
   app.post('/api/trader/:subdomain/login', async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      const { email, password } = req.body;
-      
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
-      }
-      
-      const trader = await storage.getTraderBySubdomain(subdomain);
-      if (!trader) {
-        return res.status(404).json({ message: 'Trader portal not found' });
-      }
-      
-      if (trader.status !== 'verified') {
-        return res.status(403).json({ message: 'Trader portal is not active' });
-      }
-      
-      // Find user by email
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-      
-      // Verify password
-      const isValidPassword = await comparePassword(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-      
-      // Check if user is registered with this trader
-      const portalUser = await storage.getPortalUserByUserAndTrader(user.id, trader.id);
-      if (!portalUser) {
-        return res.status(401).json({ message: 'You are not registered with this trader. Please contact the trader to register.' });
-      }
-      
-      // Generate token
-      const token = await generateToken(user.id);
-      
-      res.json({
-        message: 'Login successful',
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role
-        }
-      });
-    } catch (error) {
-      console.error('Error in trader portal login:', error);
-      res.status(500).json({ message: 'Login failed' });
-    }
-  });
-
-app.post('/api/trader/:subdomain/register', async (req, res) => {
   try {
     const { subdomain } = req.params;
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
@@ -1153,58 +1133,31 @@ app.post('/api/trader/:subdomain/register', async (req, res) => {
       return res.status(403).json({ message: 'Trader portal is not active' });
     }
     
-    // Check if user already exists
-    const existingUser = await storage.getUserByEmail(email);
-    let user;
-    
-    if (existingUser) {
-      user = existingUser;
-    } else {
-      // Create new user
-      const hashedPassword = await hashPassword(password);
-      user = await storage.createUser({
-        id: nanoid(),
-        email,
-        emailVerified: true,
-        password: hashedPassword,
-        firstName: firstName || '',
-        lastName: lastName || '',
-        role: 'user'
-      });
+    // Find user by email - NO trader dependency
+    const user = await storage.getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
     
-    // Check if user is already registered with this trader
-    const existingPortalUser = await storage.getPortalUserByUserAndTrader(user.id, trader.id);
-    if (existingPortalUser) {
-      return res.status(400).json({ message: 'You are already registered with this trader' });
+    // Verify password
+    const isValidPassword = await comparePassword(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
     
-    // Register user with trader
-    await storage.createPortalUser({
-      userId: user.id,
-      traderId: trader.id
-    });
-
-    // Send welcome email to new user (only if they weren't already registered)
-    if (!existingUser) {
-      try {
-        await sendWelcomeEmail(emailTransporter, 'userWelcome', email, {
-          firstName: firstName || '',
-          lastName: lastName || '',
-          businessName: trader.businessName,
-          subdomain: trader.subdomain || subdomain
-        });
-      } catch (emailError) {
-        console.error('Failed to send user welcome email:', emailError);
-        // Don't fail the registration if email fails
-      }
+    // OPTIONAL: Create or update analytics tracking
+    try {
+      await storage.getOrCreatePortalUser(user.id, trader.id);
+    } catch (analyticsError) {
+      console.error('Analytics tracking failed:', analyticsError);
+      // Don't fail login if analytics fail
     }
     
     // Generate token
     const token = await generateToken(user.id);
     
     res.json({
-      message: 'Registration successful',
+      message: 'Login successful',
       token,
       user: {
         id: user.id,
@@ -1213,10 +1166,103 @@ app.post('/api/trader/:subdomain/register', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in trader portal registration:', error);
-    res.status(500).json({ message: 'Registration failed' });
+    console.error('Error in trader portal login:', error);
+    res.status(500).json({ message: 'Login failed' });
   }
 });
+
+// server/routes.ts - Replace trader portal registration with redirect
+app.post('/api/trader/:subdomain/register', async (req, res) => {
+  res.status(410).json({ 
+    message: 'Registration has moved to the main platform',
+    action: 'redirect',
+    redirectUrl: `${process.env.MAIN_DOMAIN}/register`,
+    instructions: 'Please register on the main platform and then return to this trader portal to login.'
+  });
+});
+
+// app.post('/api/trader/:subdomain/register', async (req, res) => {
+//   try {
+//     const { subdomain } = req.params;
+//     const { email, password, firstName, lastName } = req.body;
+    
+//     if (!email || !password) {
+//       return res.status(400).json({ message: 'Email and password are required' });
+//     }
+    
+//     const trader = await storage.getTraderBySubdomain(subdomain);
+//     if (!trader) {
+//       return res.status(404).json({ message: 'Trader portal not found' });
+//     }
+    
+//     if (trader.status !== 'verified') {
+//       return res.status(403).json({ message: 'Trader portal is not active' });
+//     }
+    
+//     // Check if user already exists
+//     const existingUser = await storage.getUserByEmail(email);
+//     let user;
+    
+//     if (existingUser) {
+//       user = existingUser;
+//     } else {
+//       // Create new user
+//       const hashedPassword = await hashPassword(password);
+//       user = await storage.createUser({
+//         id: nanoid(),
+//         email,
+//         emailVerified: true,
+//         password: hashedPassword,
+//         firstName: firstName || '',
+//         lastName: lastName || '',
+//         role: 'user'
+//       });
+//     }
+    
+//     // Check if user is already registered with this trader
+//     const existingPortalUser = await storage.getPortalUserByUserAndTrader(user.id, trader.id);
+//     if (existingPortalUser) {
+//       return res.status(400).json({ message: 'You are already registered with this trader' });
+//     }
+    
+//     // Register user with trader
+//     await storage.createPortalUser({
+//       userId: user.id,
+//       traderId: trader.id
+//     });
+
+//     // Send welcome email to new user (only if they weren't already registered)
+//     if (!existingUser) {
+//       try {
+//         await sendWelcomeEmail(emailTransporter, 'userWelcome', email, {
+//           firstName: firstName || '',
+//           lastName: lastName || '',
+//           businessName: trader.businessName,
+//           subdomain: trader.subdomain || subdomain
+//         });
+//       } catch (emailError) {
+//         console.error('Failed to send user welcome email:', emailError);
+//         // Don't fail the registration if email fails
+//       }
+//     }
+    
+//     // Generate token
+//     const token = await generateToken(user.id);
+    
+//     res.json({
+//       message: 'Registration successful',
+//       token,
+//       user: {
+//         id: user.id,
+//         email: user.email,
+//         role: user.role
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Error in trader portal registration:', error);
+//     res.status(500).json({ message: 'Registration failed' });
+//   }
+// });
 
 
   // Add this route to your routes file
@@ -1538,7 +1584,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   // Verify OTP and complete registration
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
-    const { email, otp, subdomain, userData } = req.body;
+    const { email, otp, userData } = req.body;
 
     console.log("data coming to verify is:", req.body);
     
@@ -1575,8 +1621,12 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       // Hash the password before storing
       const hashedPassword = await hashPassword(userData.password);
       
-      if (verification.type === 'trader') {
-          newUser = await storage.createUser({
+      // Get userType from userData (from the new registration flow)
+      const userType = userData.userType || verification.type || 'user';
+      
+      if (userType === 'trader') {
+        // Create trader account
+        newUser = await storage.createUser({
           id: nanoid(),
           email,
           firstName: userData.firstName,
@@ -1586,56 +1636,68 @@ app.post('/api/auth/verify-otp', async (req, res) => {
           role: "trader" as const,
         });
 
-         await storage.createTrader({
+        // Create trader profile
+        await storage.createTrader({
           userId: newUser.id,
           businessName: `${userData.firstName} ${userData.lastName}`,
           contactInfo: email,
           nin: '',
           status: 'unverified',
           profileDescription: '',
-      });
+        });
 
-       try {
-        console.log(`First name and last name is ${userData.firstName} and ${userData.lastName}`);
-        console.log('Host:', process.env.SMTP_HOST);
-        console.log('Port:', process.env.SMTP_PORT);
-        console.log('User:', process.env.SMTP_USER);
+        // Send trader welcome email
+        try {
+          console.log(`Sending trader welcome email to ${userData.firstName} ${userData.lastName}`);
           await sendWelcomeEmail(emailTransporter, 'traderWelcome', email, {
             firstName: userData.firstName,
-            lastName: userData.lastName
+            lastName: userData.lastName,
+            nextStep: 'Complete your trader profile to get started'
           });
         } catch (emailError) {
           console.error('Failed to send trader welcome email:', emailError);
-           return res.status(400).json({ message: `Email Error ${emailError}` });
           // Don't fail the registration if email fails
         }
 
       } else {
-        const trader = await storage.getTraderBySubdomain(subdomain);
-        if (!trader) {
-          return res.status(404).json({ message: "Trader with subdomain not found" });
-        }
-
-        const userId = nanoid();
-        newUser = await storage.createUserWithTraderLink({
-          id: userId,
-          email: userData.email,
+        // Create regular user account
+        newUser = await storage.createUser({
+          id: nanoid(),
+          email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
           emailVerified: true,
           password: hashedPassword,
-          firstName: userData.firstName.trim(),
-          lastName: userData.lastName.trim(),
-          role: 'user',
-        }, trader.id);
+          role: "user" as const,
+        });
+
+        // Send user welcome email
+        try {
+          console.log(`Sending user welcome email to ${userData.firstName} ${userData.lastName}`);
+          await sendWelcomeEmail(emailTransporter, 'userWelcome', email, {
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            nextStep: 'Explore our verified traders and start trading'
+          });
+        } catch (emailError) {
+          console.error('Failed to send user welcome email:', emailError);
+          // Don't fail the registration if email fails
+        }
       }
 
+      // Generate token
+      const token = await generateToken(newUser.id);
+
       // Remove password from response for security
-      const { ...userWithoutPassword } = newUser;
+      const { password: _, ...userWithoutPassword } = newUser;
 
       res.json({ 
         success: true, 
         message: "Email verified and account created successfully",
-        user: userWithoutPassword, // Don't send password back
-        redirectTo: '/'
+        token,
+        user: userWithoutPassword,
+        userType: userType,
+        nextStep: userType === 'trader' ? 'complete_trader_profile' : 'discover_traders'
       });
     } else {
       res.json({ 
@@ -1646,6 +1708,98 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   } catch (error) {
     console.error("Error verifying OTP:", error);
     res.status(500).json({ message: "Failed to verify OTP" });
+  }
+});
+
+// Add these routes to your server/routes.ts file
+
+// Get all verified traders for discovery
+app.get('/api/traders/discover', async (req, res) => {
+  try {
+    const { search, limit = 20, offset = 0 } = req.query;
+    
+    const result = await storage.getDiscoverableTraders({
+      search: search as string,
+      limit: Number(limit),
+      offset: Number(offset),
+    });
+    
+    res.json({
+      traders: result.traders,
+      pagination: {
+        limit: Number(limit),
+        offset: Number(offset),
+        total: result.total,
+        hasMore: Number(offset) + Number(limit) < result.total,
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching traders for discovery:', error);
+    res.status(500).json({ message: 'Failed to fetch traders' });
+  }
+});
+
+// Get specific trader statistics
+app.get('/api/trader/:traderId/stats', async (req, res) => {
+  try {
+    const { traderId } = req.params;
+    
+    const stats = await storage.getTraderStats(Number(traderId));
+    
+    res.json(stats);
+    
+  } catch (error) {
+    console.error('Error fetching trader stats:', error);
+    res.status(500).json({ message: 'Failed to fetch trader statistics' });
+  }
+});
+
+// Search traders (for search suggestions/autocomplete)
+app.get('/api/traders/search', async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+    
+    if (!q || (q as string).length < 2) {
+      return res.json({ traders: [] });
+    }
+    
+    const traders = await storage.searchTraders(q as string, Number(limit));
+    
+    res.json({ traders });
+    
+  } catch (error) {
+    console.error('Error searching traders:', error);
+    res.status(500).json({ message: 'Failed to search traders' });
+  }
+});
+
+// Get user's discovery dashboard data (recent chats, recent traders, etc.)
+app.get('/api/user/discovery-dashboard', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    // Get user's active chats
+    const activeChats = await storage.getUserActiveChatsForDiscovery(userId);
+    
+    // Get recently interacted traders
+    const recentTraders = await storage.getUserRecentTraders(userId, 5);
+    
+    // Get some featured/popular traders
+    const featuredTraders = await storage.getDiscoverableTraders({
+      limit: 6,
+      offset: 0,
+    });
+    
+    res.json({
+      activeChats,
+      recentTraders,
+      featuredTraders: featuredTraders.traders,
+    });
+    
+  } catch (error) {
+    console.error('Error fetching user discovery dashboard:', error);
+    res.status(500).json({ message: 'Failed to fetch discovery dashboard' });
   }
 });
 

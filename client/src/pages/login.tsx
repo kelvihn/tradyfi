@@ -84,33 +84,37 @@ export default function Login() {
       return response.json();
     },
     onSuccess: async (data) => {
-      console.log('🔑 Login successful, token received');
-      localStorage.setItem('token', data.token);
+    console.log('🔑 Login successful, token received');
+    localStorage.setItem('token', data.token);
 
-      try {
-        console.log('🔄 Starting auth state update...');
-        await refetch();
-        console.log('✅ Auth refetch completed');
-        
-        queryClient.invalidateQueries({ queryKey: ["/api/trader/status"] });
-        console.log('✅ Trader status query invalidated');
+    try {
+      console.log('🔄 Starting auth state update...');
+      await refetch();
+      console.log('✅ Auth refetch completed');
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/trader/status"] });
+      console.log('✅ Trader status query invalidated');
 
-        toast({
-          title: "Login successful!",
-          description: "Welcome back!",
-        });
+      toast({
+        title: "Login successful!",
+        description: "Welcome back!",
+      });
 
-        // Wait for React to re-render with new state
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        console.log('🚀 Navigating to home...');
-        navigate("/home", { replace: true });
-        
-      } catch (error) {
-        console.error('❌ Error updating auth state:', error);
-        navigate("/", { replace: true });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (data.user?.role === 'trader') {
+        console.log('🚀 Redirecting trader to dashboard...');
+        navigate("/trader/dashboard", { replace: true });
+      } else {
+        console.log('🚀 Redirecting user to discover page...');
+        navigate("/discover", { replace: true });
       }
-    },
+      
+    } catch (error) {
+      console.error('❌ Error updating auth state:', error);
+      navigate("/", { replace: true });
+    }
+  },
     onError: (error: Error) => {
       // Check if it's an unverified email error
       if (error.message.includes('Email not verified') || error.message.includes('EMAIL_NOT_VERIFIED')) {

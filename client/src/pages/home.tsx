@@ -212,7 +212,7 @@ export default function Home() {
                 </p>
                 <Link href="/trader/register">
                   <Button className="w-full btn-primary">
-                    Register as Trader
+                   Signup
                   </Button>
                 </Link>
               </CardContent>

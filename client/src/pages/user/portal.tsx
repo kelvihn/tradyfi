@@ -226,7 +226,7 @@ export default function UserPortal({ subdomain }: UserPortalProps) {
               onClick={() => window.location.href = "/register"}
               className="w-full"
             >
-              Create Account
+            Signup
             </Button>
           </div>
         </div>

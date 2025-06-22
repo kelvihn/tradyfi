@@ -136,6 +136,58 @@ getSubscriptionCancellationDetails(userId: string): Promise<{
   willExpireOn: Date | null;
   subscriptionId: number | null;
 }>;
+getUserByEmailForAnyTrader(email: string): Promise<User | undefined>;
+getOrCreatePortalUser(userId: string, traderId: number): Promise<PortalUser>;
+updatePortalUserInteraction(portalUserId: number): Promise<void>;
+
+ // Trader discovery operations
+  getDiscoverableTraders(options: {
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    traders: Array<{
+      id: number;
+      businessName: string;
+      profileDescription: string | null;
+      subdomain: string | null;
+      createdAt: Date | null;
+      userCount: number;
+    }>;
+    total: number;
+  }>;
+
+  getTraderStats(traderId: number): Promise<{
+    userCount: number;
+    chatCount: number;
+    avgInteractions: number;
+    lastActivity: Date | null;
+  }>;
+
+  getUserActiveChatsForDiscovery(userId: string): Promise<Array<{
+    traderId: number;
+    traderName: string;
+    traderSubdomain: string | null;
+    lastMessageTime: Date | null;
+    unreadCount: number;
+    tradingOption: string;
+  }>>;
+
+  getUserRecentTraders(userId: string, limit?: number): Promise<Array<{
+    traderId: number;
+    traderName: string;
+    traderSubdomain: string | null;
+    lastInteraction: Date | null;
+    interactionCount: number;
+  }>>;
+
+  searchTraders(searchTerm: string, limit?: number): Promise<Array<{
+    id: number;
+    businessName: string;
+    profileDescription: string | null;
+    subdomain: string | null;
+    userCount: number;
+  }>>;
 
   
 }
@@ -156,6 +208,245 @@ export type TraderWithUser = Trader & {
 };
 
 export class DatabaseStorage implements IStorage {
+
+  // Add these methods to your DatabaseStorage class in storage.ts
+
+// Trader discovery operations
+async getDiscoverableTraders(options: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  traders: Array<{
+    id: number;
+    businessName: string;
+    profileDescription: string | null;
+    subdomain: string | null;
+    createdAt: Date | null;
+    userCount: number;
+  }>;
+  total: number;
+}> {
+  const { search, limit = 20, offset = 0 } = options;
+
+  // Base query for verified traders
+  let whereCondition = eq(traders.status, 'verified');
+  
+  // Add search conditions if provided
+  if (search) {
+    whereCondition = and(
+      eq(traders.status, 'verified'),
+      or(
+        sql`${traders.businessName} ILIKE ${`%${search}%`}`,
+        sql`${traders.profileDescription} ILIKE ${`%${search}%`}`
+      )
+    );
+  }
+
+  // Get traders with user count
+  const tradersResult = await db
+    .select({
+      id: traders.id,
+      businessName: traders.businessName,
+      profileDescription: traders.profileDescription,
+      subdomain: traders.subdomain,
+      createdAt: traders.createdAt,
+      userCount: sql<number>`(
+        SELECT COUNT(*) 
+        FROM ${portalUsers} 
+        WHERE ${portalUsers.traderId} = ${traders.id}
+      )`,
+    })
+    .from(traders)
+    .where(whereCondition)
+    .orderBy(desc(traders.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  // Get total count for pagination
+  const [{ count: total }] = await db
+    .select({ count: count() })
+    .from(traders)
+    .where(whereCondition);
+
+  return {
+    traders: tradersResult,
+    total,
+  };
+}
+
+// Get trader statistics for discovery page
+async getTraderStats(traderId: number): Promise<{
+  userCount: number;
+  chatCount: number;
+  avgInteractions: number;
+  lastActivity: Date | null;
+}> {
+  const [stats] = await db
+    .select({
+      userCount: sql<number>`COUNT(DISTINCT ${portalUsers.userId})`,
+      chatCount: sql<number>`COUNT(DISTINCT ${chatRooms.id})`,
+      avgInteractions: sql<number>`AVG(${portalUsers.interactionCount})`,
+      lastActivity: sql<Date>`MAX(${chatRooms.updatedAt})`,
+    })
+    .from(traders)
+    .leftJoin(portalUsers, eq(traders.id, portalUsers.traderId))
+    .leftJoin(chatRooms, eq(traders.id, chatRooms.traderId))
+    .where(eq(traders.id, traderId))
+    .groupBy(traders.id);
+
+  return stats || {
+    userCount: 0,
+    chatCount: 0,
+    avgInteractions: 0,
+    lastActivity: null,
+  };
+}
+
+// Get user's active chats with traders for discovery page
+async getUserActiveChatsForDiscovery(userId: string): Promise<Array<{
+  traderId: number;
+  traderName: string;
+  traderSubdomain: string | null;
+  lastMessageTime: Date | null;
+  unreadCount: number;
+  tradingOption: string;
+}>> {
+  const activeChats = await db
+    .select({
+      traderId: chatRooms.traderId,
+      traderName: traders.businessName,
+      traderSubdomain: traders.subdomain,
+      lastMessageTime: sql<Date>`MAX(${chatMessages.createdAt})`,
+      unreadCount: sql<number>`COUNT(CASE WHEN ${chatMessages.isRead} = false AND ${chatMessages.senderId} != ${userId} THEN 1 END)`,
+      tradingOption: chatRooms.tradingOption,
+    })
+    .from(chatRooms)
+    .innerJoin(traders, eq(chatRooms.traderId, traders.id))
+    .leftJoin(chatMessages, eq(chatRooms.id, chatMessages.chatRoomId))
+    .where(
+      and(
+        eq(chatRooms.userId, userId),
+        eq(chatRooms.isActive, true),
+        eq(traders.status, 'verified')
+      )
+    )
+    .groupBy(
+      chatRooms.traderId,
+      traders.businessName,
+      traders.subdomain,
+      chatRooms.tradingOption
+    )
+    .orderBy(desc(sql`MAX(${chatMessages.createdAt})`));
+
+  return activeChats;
+}
+
+// Get recently interacted traders for a user
+async getUserRecentTraders(userId: string, limit: number = 5): Promise<Array<{
+  traderId: number;
+  traderName: string;
+  traderSubdomain: string | null;
+  lastInteraction: Date | null;
+  interactionCount: number;
+}>> {
+  const recentTraders = await db
+    .select({
+      traderId: portalUsers.traderId,
+      traderName: traders.businessName,
+      traderSubdomain: traders.subdomain,
+      lastInteraction: portalUsers.lastInteractionDate,
+      interactionCount: portalUsers.interactionCount,
+    })
+    .from(portalUsers)
+    .innerJoin(traders, eq(portalUsers.traderId, traders.id))
+    .where(
+      and(
+        eq(portalUsers.userId, userId),
+        eq(traders.status, 'verified')
+      )
+    )
+    .orderBy(desc(portalUsers.lastInteractionDate))
+    .limit(limit);
+
+  return recentTraders;
+}
+
+// Search traders by name or description
+async searchTraders(searchTerm: string, limit: number = 10): Promise<Array<{
+  id: number;
+  businessName: string;
+  profileDescription: string | null;
+  subdomain: string | null;
+  userCount: number;
+}>> {
+  const searchResults = await db
+    .select({
+      id: traders.id,
+      businessName: traders.businessName,
+      profileDescription: traders.profileDescription,
+      subdomain: traders.subdomain,
+      userCount: sql<number>`(
+        SELECT COUNT(*) 
+        FROM ${portalUsers} 
+        WHERE ${portalUsers.traderId} = ${traders.id}
+      )`,
+    })
+    .from(traders)
+    .where(
+      and(
+        eq(traders.status, 'verified'),
+        or(
+          sql`${traders.businessName} ILIKE ${`%${searchTerm}%`}`,
+          sql`${traders.profileDescription} ILIKE ${`%${searchTerm}%`}`
+        )
+      )
+    )
+    .orderBy(
+      // Prioritize exact matches in business name
+      sql`CASE WHEN ${traders.businessName} ILIKE ${`%${searchTerm}%`} THEN 1 ELSE 2 END`,
+      desc(sql`(SELECT COUNT(*) FROM ${portalUsers} WHERE ${portalUsers.traderId} = ${traders.id})`)
+    )
+    .limit(limit);
+
+  return searchResults;
+}
+
+  async getUserByEmailForAnyTrader(email: string): Promise<User | undefined> {
+  const [user] = await db.select().from(users).where(eq(users.email, email));
+  return user;
+}
+
+  async getOrCreatePortalUser(userId: string, traderId: number): Promise<PortalUser> {
+  let portalUser = await this.getPortalUserByUserAndTrader(userId, traderId);
+  
+  if (!portalUser) {
+    portalUser = await this.createPortalUser({
+      userId,
+      traderId,
+      firstInteractionDate: new Date(),
+      lastInteractionDate: new Date(),
+      interactionCount: 1,
+    });
+    
+    console.log(`Created new portal user analytics for user ${userId} and trader ${traderId}`);
+  } else {
+    // Update interaction data
+    await this.updatePortalUserInteraction(portalUser.id);
+  }
+  
+  return portalUser;
+}
+
+async updatePortalUserInteraction(portalUserId: number): Promise<void> {
+  await db
+    .update(portalUsers)
+    .set({
+      lastInteractionDate: new Date(),
+      interactionCount: sql`${portalUsers.interactionCount} + 1`,
+    })
+    .where(eq(portalUsers.id, portalUserId));
+}
 
   async createFCMToken(data: Omit<InsertFCMToken, 'id' | 'createdAt' | 'updatedAt'>): Promise<FCMToken> {
   const [token] = await db.insert(fcmTokens)

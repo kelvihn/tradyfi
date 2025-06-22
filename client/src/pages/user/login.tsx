@@ -267,12 +267,12 @@ export default function UserLogin() {
                 )}
               </Button>
 
-              <div className="text-center text-sm">
+              {/* <div className="text-center text-sm">
                 <span className="text-muted-foreground">Don't have an account? </span>
                 <Link href="/register" className="text-primary hover:underline font-medium">
                   Sign up
                 </Link>
-              </div>
+              </div> */}
             </form>
           </CardContent>
         </Card>
