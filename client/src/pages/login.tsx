@@ -113,7 +113,7 @@ const loginMutation = useMutation({
       } else {
         // For regular users or fallback
         console.log('🚀 Navigating to home...');
-        navigate("/home", { replace: true });
+        navigate("/discover", { replace: true });
       }
       
     } catch (error) {
