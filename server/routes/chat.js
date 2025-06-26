@@ -86,6 +86,7 @@ router.post('/rooms/:roomId/messages', authenticateToken, async (req, res) => {
 
 // Upload file attachment
 router.post('/upload', authenticateToken, upload.array('files', 5), async (req, res) => {
+  console.log("making API calls", req);
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No files uploaded' });
@@ -98,6 +99,8 @@ router.post('/upload', authenticateToken, upload.array('files', 5), async (req, 
       size: file.size,
       public_id: file.filename
     }));
+
+    console.log("uploaded files @@@@");
     
     res.json({ files: uploadedFiles });
   } catch (error) {

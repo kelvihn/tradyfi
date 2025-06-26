@@ -109,7 +109,7 @@ const loginMutation = useMutation({
       
       if (userRole === 'trader') {
         console.log('🚀 Navigating to trader dashboard...');
-        navigate("/trader/dashboard", { replace: true });
+        navigate("/home", { replace: true });
       } else {
         // For regular users or fallback
         console.log('🚀 Navigating to home...');
