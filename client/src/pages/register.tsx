@@ -115,7 +115,7 @@ export default function Register() {
     
     // Redirect based on user type
     if (activeTab === 'trader') {
-      navigate("/trader/register"); // Complete trader profile
+      navigate("/home"); // Complete trader profile
     } else {
       navigate("/discover"); // Trader discovery page
     }

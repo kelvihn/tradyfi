@@ -2211,7 +2211,7 @@ app.post('/api/admin/traders/:id/unsuspend', authenticate, async (req: AuthReque
                 </div>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="https://tradyfi.ng/trader/dashboard" 
+                  <a href="https://tradyfi.ng/home" 
                      style="display: inline-block; background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                     Access Your Dashboard
                   </a>
