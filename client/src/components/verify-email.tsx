@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, Shield } from "lucide-react";
 import { getSubdomain } from "@/lib/subdomain";
+import { useAuth } from "@/hooks/useAuth"; // Add this import
 
 const otpSchema = z.object({
   otp: z.string().length(6, "OTP must be 6 digits").regex(/^\d+$/, "OTP must contain only numbers"),
@@ -30,6 +31,8 @@ export default function OTPVerification({ email, type, userData, onSuccess, onBa
   const [success, setSuccess] = useState<string | null>(null);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const queryClient = useQueryClient(); // Add this
+  const { refetch: refetchAuth } = useAuth(); // Add this
 
   const form = useForm<OTPForm>({
     resolver: zodResolver(otpSchema),
@@ -75,9 +78,31 @@ export default function OTPVerification({ email, type, userData, onSuccess, onBa
       
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setSuccess("Email verified successfully!");
-      setTimeout(() => onSuccess(data), 1500);
+      
+      // Store token immediately
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        
+        if (data.user) {
+          localStorage.setItem("userData", JSON.stringify(data.user));
+        }
+      }
+
+      // Invalidate auth queries and refetch user data
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Wait for auth context to update
+      try {
+        await refetchAuth();
+        console.log("Auth context updated successfully");
+      } catch (error) {
+        console.error("Failed to update auth context:", error);
+      }
+      
+      // Small delay to ensure auth state is updated
+      setTimeout(() => onSuccess(data), 500);
     },
     onError: (error: Error) => {
       setError(error.message);

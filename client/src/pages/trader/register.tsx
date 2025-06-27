@@ -123,7 +123,7 @@ export default function TraderRegister() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/trader/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/");
+      setLocation("/home");
     },
     onError: (error: Error) => {
       toast({
@@ -253,7 +253,7 @@ export default function TraderRegister() {
         <div className="mb-6">
           <Button
             variant="ghost"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/home")}
             className="mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />

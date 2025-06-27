@@ -98,27 +98,41 @@ export default function Register() {
   const handleVerificationSuccess = (data: any) => {
     // After successful verification, the account is created
     // Store token and redirect based on user type
-    if (data.token) {
-      localStorage.setItem("token", data.token);
+    // if (data.token) {
+    //   localStorage.setItem("token", data.token);
       
-      if (data.user) {
-        localStorage.setItem("userData", JSON.stringify(data.user));
-      }
-    }
-    
-    toast({
+    //   if (data.user) {
+    //     localStorage.setItem("userData", JSON.stringify(data.user));
+    //   }
+    // }
+
+    if (activeTab === 'trader') {
+       toast({
       title: "Registration successful!",
       description: `Welcome! Your ${activeTab} account has been created and verified.`,
     });
+
+     navigate("/login", {replace: true});
+    } else {
+       toast({
+      title: "Registration successful!",
+      description: `Welcome! Your account has been created and verified. You can now login to any trader portal`,
+    });
+
+     navigate("/", {replace: true});
     
+    }
+    
+   
     queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     
     // Redirect based on user type
-    if (activeTab === 'trader') {
-      navigate("/home"); // Complete trader profile
-    } else {
-      navigate("/discover"); // Trader discovery page
-    }
+   
+    // if (activeTab === 'trader') {
+    //   navigate("/", {replace: true});
+    // } else {
+    //   navigate("/discover"); // Trader discovery page
+    // }
   };
 
   const handleBack = () => {

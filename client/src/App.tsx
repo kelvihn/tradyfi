@@ -328,6 +328,7 @@ function Router() {
       
       {/* Protected trader routes */}
       <Route path="/trader/register" component={TraderRegister} />
+      
       <Route path="/trader/dashboard">
         <ProtectedTraderRoute>
           <TraderDashboard />
