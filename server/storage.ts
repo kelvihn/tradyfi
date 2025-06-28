@@ -143,6 +143,9 @@ getUserByEmailForAnyTrader(email: string): Promise<User | undefined>;
 getOrCreatePortalUser(userId: string, traderId: number): Promise<PortalUser>;
 updatePortalUserInteraction(portalUserId: number): Promise<void>;
 
+getLastVisitorNotification(traderId: number, userId: string): Promise<any>;
+upsertVisitorNotification(traderId: number, userId: string, visitorName: string, timestamp: Date): Promise<any>;
+
  // Trader discovery operations
   getDiscoverableTraders(options: {
     search?: string;
@@ -213,6 +216,50 @@ export type TraderWithUser = Trader & {
 export class DatabaseStorage implements IStorage {
 
   // Add these methods to your DatabaseStorage class in storage.ts
+
+// Get last visitor notification for a user-trader combination
+async getLastVisitorNotification(traderId: number, userId: string): Promise<any> {
+  const [notification] = await db
+    .select()
+    .from(visitorNotifications)
+    .where(
+      and(
+        eq(visitorNotifications.traderId, traderId),
+        eq(visitorNotifications.userId, userId)
+      )
+    )
+    .limit(1);
+  
+  return notification;
+}
+
+// Insert or update visitor notification record
+async upsertVisitorNotification(
+  traderId: number,
+  userId: string,
+  visitorName: string,
+  timestamp: Date
+): Promise<any> {
+  const [notification] = await db
+    .insert(visitorNotifications)
+    .values({
+      traderId,
+      userId,
+      visitorName,
+      lastNotificationSent: timestamp,
+      createdAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [visitorNotifications.traderId, visitorNotifications.userId],
+      set: {
+        visitorName,
+        lastNotificationSent: timestamp,
+      },
+    })
+    .returning();
+  
+  return notification;
+}
 
 // Trader discovery operations
 async getDiscoverableTraders(options: {
