@@ -9,6 +9,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
 import { sendWelcomeEmail } from "./emailTemplates";
+import { VisitorNotificationService } from './services/visitorNotification';
 
 const emailTransporter = nodemailer.createTransport({
   host: 'smtp.sendgrid.net',
@@ -110,6 +111,22 @@ app.post('/api/user/login', async (req, res) => {
     } catch (analyticsError) {
       console.error('Analytics tracking failed:', analyticsError);
       // Don't fail login if analytics fail
+    }
+
+    // 🚨 NEW: Handle visitor notification (add this after successful authentication)
+    try {
+      const visitorNotificationService = new VisitorNotificationService(storage, emailTransporter);
+      const visitorName = `${user.firstName} ${user.lastName}`.trim() || user.email;
+      
+      await visitorNotificationService.handleVisitorLogin(
+        trader.id,
+        user.id,
+        visitorName,
+        subdomain
+      );
+    } catch (notificationError) {
+      console.error('Visitor notification failed:', notificationError);
+      // Don't fail login if notification fails
     }
 
     const token = await generateToken(user.id);
@@ -1178,7 +1195,7 @@ app.get('/api/trader/:subdomain/auth', authenticate, async (req: AuthRequest, re
   }
 });
 
-  app.post('/api/trader/:subdomain/login', async (req, res) => {
+app.post('/api/trader/:subdomain/login', async (req, res) => {
   try {
     const { subdomain } = req.params;
     const { email, password } = req.body;
@@ -1214,6 +1231,22 @@ app.get('/api/trader/:subdomain/auth', authenticate, async (req: AuthRequest, re
     } catch (analyticsError) {
       console.error('Analytics tracking failed:', analyticsError);
       // Don't fail login if analytics fail
+    }
+    
+    // 🚨 NEW: Handle visitor notification (add this after successful authentication)
+    try {
+      const visitorNotificationService = new VisitorNotificationService(storage, emailTransporter);
+      const visitorName = `${user.firstName} ${user.lastName}`.trim() || user.email;
+      
+      await visitorNotificationService.handleVisitorLogin(
+        trader.id,
+        user.id,
+        visitorName,
+        subdomain
+      );
+    } catch (notificationError) {
+      console.error('Visitor notification failed:', notificationError);
+      // Don't fail login if notification fails
     }
     
     // Generate token

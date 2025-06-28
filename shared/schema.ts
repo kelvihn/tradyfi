@@ -27,6 +27,31 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+export const visitorNotifications = pgTable("visitor_notifications", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  traderId: integer("trader_id").notNull().references(() => traders.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  visitorName: text("visitor_name").notNull(),
+  lastNotificationSent: timestamp("last_notification_sent").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserTrader: unique().on(table.traderId, table.userId),
+}));
+
+export const visitorNotificationsRelations = relations(visitorNotifications, ({ one }) => ({
+  trader: one(traders, {
+    fields: [visitorNotifications.traderId],
+    references: [traders.id],
+  }),
+  user: one(users, {
+    fields: [visitorNotifications.userId],
+    references: [users.id],
+  }),
+}));
+
+export type VisitorNotification = typeof visitorNotifications.$inferSelect;
+export type InsertVisitorNotification = typeof visitorNotifications.$inferInsert;
+
 export const userActivity = pgTable("user_activity", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id),
