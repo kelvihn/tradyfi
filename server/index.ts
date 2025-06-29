@@ -8,8 +8,12 @@ import { setupVite, serveStatic, log } from "./vite";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import "./instrument";
+import * as Sentry from "@sentry/node";
+
 
 const app = express();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -75,6 +79,8 @@ app.use((req, res, next) => {
 
   // Now register routes
   await registerRoutes(app);
+
+  Sentry.setupExpressErrorHandler(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
