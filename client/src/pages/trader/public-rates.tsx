@@ -70,13 +70,24 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
 
   const formatRate = (rate: TraderRate) => {
     const rateValue = parseFloat(rate.ratePerDollar);
-    return {
-      formattedRate: rateValue.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 8,
-      }),
-      symbol: rate.currencySymbol || (rate.type === 'giftcard' ? 'NGN' : rate.currency),
-    };
+    const formattedRate = rateValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+    });
+    
+    if (rate.type === 'crypto') {
+      // For crypto: show "1 ETH = 3,000 USD" (flip the display)
+      return {
+        displayText: `1 ${rate.currency} = ${formattedRate} ${rate.currencySymbol || 'USD'}`,
+        symbol: rate.currencySymbol || 'USD',
+      };
+    } else {
+      // For giftcards: keep "1 USD = 1,650 NGN" (original format)
+      return {
+        displayText: `1 USD = ${formattedRate} ${rate.currencySymbol || 'NGN'}`,
+        symbol: rate.currencySymbol || 'NGN',
+      };
+    }
   };
 
   const formatLastUpdated = (dateString: string) => {
@@ -247,7 +258,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {rates.crypto.map((rate) => {
-                      const { formattedRate, symbol } = formatRate(rate);
+                      const { displayText } = formatRate(rate);
                       return (
                         <div key={rate.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-1 sm:space-y-0">
@@ -257,7 +268,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
                             </Badge>
                           </div>
                           <div className="text-sm text-slate-600 mb-1">
-                            <strong>1 USD = {formattedRate} {symbol}</strong>
+                            <strong>{displayText}</strong>
                           </div>
                           <div className="text-xs text-slate-500">
                             <strong>Updated: {formatLastUpdated(rate.updatedAt)}</strong>
@@ -282,7 +293,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {rates.giftcard.map((rate) => {
-                      const { formattedRate, symbol } = formatRate(rate);
+                      const { displayText } = formatRate(rate);
                       return (
                         <div key={rate.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-1 sm:space-y-0">
@@ -292,7 +303,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
                             </Badge>
                           </div>
                           <div className="text-sm text-slate-600 mb-1">
-                            <strong>1 USD = {formattedRate} {symbol}</strong>
+                            <strong>{displayText}</strong>
                           </div>
                           <div className="text-xs text-slate-500">
                             <strong>Updated: {formatLastUpdated(rate.updatedAt)}</strong>
