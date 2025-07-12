@@ -2286,6 +2286,148 @@ app.post('/api/admin/traders/:id/unsuspend', authenticate, async (req: AuthReque
   }
 });
 
+app.get('/api/trader/rates', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const trader = await storage.getTraderByUserId(req.user!.id);
+    if (!trader) {
+      return res.status(404).json({ message: "Trader not found" });
+    }
+
+    const rates = await storage.getTraderRates(trader.id);
+    res.json(rates);
+  } catch (error) {
+    console.error("Error fetching trader rates:", error);
+    res.status(500).json({ message: "Failed to fetch rates" });
+  }
+});
+
+app.post('/api/trader/rates', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const trader = await storage.getTraderByUserId(req.user!.id);
+    if (!trader) {
+      return res.status(404).json({ message: "Trader not found" });
+    }
+
+    const { currency, type, ratePerDollar, currencySymbol } = req.body;
+
+    if (!currency || !type || !ratePerDollar) {
+      return res.status(400).json({ message: "Currency, type, and rate are required" });
+    }
+
+    if (!['crypto', 'giftcard'].includes(type)) {
+      return res.status(400).json({ message: "Type must be 'crypto' or 'giftcard'" });
+    }
+
+    const rate = await storage.createTraderRate({
+      traderId: trader.id,
+      currency: currency.trim(),
+      type,
+      ratePerDollar: ratePerDollar.toString(),
+      currencySymbol: currencySymbol?.trim() || '',
+      isActive: true,
+    });
+
+    res.status(201).json(rate);
+  } catch (error) {
+    console.error("Error creating trader rate:", error);
+    res.status(500).json({ message: "Failed to create rate" });
+  }
+});
+
+app.put('/api/trader/rates/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const trader = await storage.getTraderByUserId(req.user!.id);
+    if (!trader) {
+      return res.status(404).json({ message: "Trader not found" });
+    }
+
+    const rateId = parseInt(req.params.id);
+    const existingRate = await storage.getTraderRate(rateId);
+    
+    if (!existingRate || existingRate.traderId !== trader.id) {
+      return res.status(404).json({ message: "Rate not found" });
+    }
+
+    const { currency, type, ratePerDollar, currencySymbol } = req.body;
+
+    const updates: Partial<any> = {};
+    if (currency !== undefined) updates.currency = currency.trim();
+    if (type !== undefined) {
+      if (!['crypto', 'giftcard'].includes(type)) {
+        return res.status(400).json({ message: "Type must be 'crypto' or 'giftcard'" });
+      }
+      updates.type = type;
+    }
+    if (ratePerDollar !== undefined) updates.ratePerDollar = ratePerDollar.toString();
+    if (currencySymbol !== undefined) updates.currencySymbol = currencySymbol.trim();
+
+    const updatedRate = await storage.updateTraderRate(rateId, updates);
+    res.json(updatedRate);
+  } catch (error) {
+    console.error("Error updating trader rate:", error);
+    res.status(500).json({ message: "Failed to update rate" });
+  }
+});
+
+app.delete('/api/trader/rates/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const trader = await storage.getTraderByUserId(req.user!.id);
+    if (!trader) {
+      return res.status(404).json({ message: "Trader not found" });
+    }
+
+    const rateId = parseInt(req.params.id);
+    const existingRate = await storage.getTraderRate(rateId);
+    
+    if (!existingRate || existingRate.traderId !== trader.id) {
+      return res.status(404).json({ message: "Rate not found" });
+    }
+
+    await storage.deleteTraderRate(rateId);
+    res.json({ message: "Rate deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting trader rate:", error);
+    res.status(500).json({ message: "Failed to delete rate" });
+  }
+});
+
+// Public routes (no authentication required)
+app.get('/api/trader/:subdomain/rates', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+    const trader = await storage.getTraderBySubdomain(subdomain);
+    
+    if (!trader) {
+      return res.status(404).json({ message: 'Trader not found' });
+    }
+
+    if (trader.status !== 'verified') {
+      return res.status(403).json({ message: 'Trader portal is not active' });
+    }
+
+    const rates = await storage.getPublicTraderRates(trader.id);
+    
+    // Group rates by type
+    const groupedRates = {
+      crypto: rates.filter(rate => rate.type === 'crypto'),
+      giftcard: rates.filter(rate => rate.type === 'giftcard'),
+    };
+
+    res.json({
+      trader: {
+        id: trader.id,
+        businessName: trader.businessName,
+        subdomain: trader.subdomain,
+      },
+      rates: groupedRates,
+      lastUpdated: rates.length > 0 ? rates[0].updatedAt : null,
+    });
+  } catch (error) {
+    console.error('Error fetching public trader rates:', error);
+    res.status(500).json({ message: 'Failed to fetch rates' });
+  }
+});
+
 
   // Resend OTP
   app.post('/api/auth/resend-otp', async (req, res) => {

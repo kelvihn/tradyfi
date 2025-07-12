@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ChartLine, MessageCircle, Users, Globe, ExternalLink, Plus, Clock, DollarSign, ArrowLeft, User, Edit } from "lucide-react";
+import { ChartLine, MessageCircle, Users, Globe, ExternalLink, Plus, Clock, DollarSign, ArrowLeft, User, Edit, TrendingUp, Settings  } from "lucide-react";
 import { SubscriptionCard } from "@/components/subscription/subscription-card";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useUserAuth } from "@/hooks/useUserAuth";
@@ -199,9 +199,10 @@ export default function TraderDashboard() {
         <SubscriptionWarningCard traderStatus={traderStatus} />
         <br></br>
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="rates">Rates</TabsTrigger>
             <TabsTrigger value="chats">Messages</TabsTrigger>
             <TabsTrigger value="subscription">Subscription</TabsTrigger>
           </TabsList>
@@ -356,6 +357,114 @@ export default function TraderDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="rates" className="space-y-6">
+  <Card>
+    <CardHeader>
+      <div className="flex items-center justify-between">
+        <CardTitle className="flex items-center">
+          <TrendingUp className="h-5 w-5 mr-2" />
+          Trading Rates Management
+        </CardTitle>
+        <Button 
+          onClick={() => window.location.href = '/trader/rates'}
+          className="bg-primary hover:bg-primary/90"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Manage Rates
+        </Button>
+      </div>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
+            <div className="flex items-center mb-3">
+              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-white" />
+              </div>
+              <div className="ml-3">
+                <h3 className="font-semibold text-green-800">Cryptocurrency Rates</h3>
+                <p className="text-sm text-green-600">Set rates for crypto trading</p>
+              </div>
+            </div>
+            <p className="text-sm text-green-700 mb-4">
+              Configure your buy/sell rates for various cryptocurrencies like Bitcoin, Ethereum, USDT, and more.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.location.href = '/trader/rates'}
+              className="border-green-300 text-green-700 hover:bg-green-50"
+            >
+              Manage Crypto Rates
+            </Button>
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
+            <div className="flex items-center mb-3">
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-white" />
+              </div>
+              <div className="ml-3">
+                <h3 className="font-semibold text-blue-800">Gift Card Rates</h3>
+                <p className="text-sm text-blue-600">Set rates for gift card trading</p>
+              </div>
+            </div>
+            <p className="text-sm text-blue-700 mb-4">
+              Configure your rates for popular gift cards like Amazon, iTunes, Google Play, and other brands.
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.location.href = '/trader/rates'}
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              Manage Gift Card Rates
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-6 rounded-lg border">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-slate-800">Public Rates Page</h3>
+            <Badge variant="secondary">Public</Badge>
+          </div>
+          <p className="text-sm text-slate-600 mb-4">
+            Your rates are automatically published on your public rates page where potential customers can view your current exchange rates.
+          </p>
+          <div className="flex items-center space-x-2">
+            <code className="text-sm bg-white px-3 py-2 rounded border">
+              {(traderStatus as any)?.subdomain}.tradyfi.ng/rates
+            </code>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => window.open(`https://${(traderStatus as any)?.subdomain}.tradyfi.ng/rates`, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+          <div className="flex items-start space-x-3">
+            <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center mt-0.5">
+              <span className="text-white text-xs font-bold">!</span>
+            </div>
+            <div>
+              <h4 className="font-medium text-amber-800 mb-1">Keep Your Rates Updated</h4>
+              <p className="text-sm text-amber-700">
+                Regular rate updates help build customer trust and ensure competitive pricing. 
+                Consider updating your rates daily or when market conditions change significantly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
 
           {/* Messages Tab */}
           <TabsContent value="chats" className="space-y-6">

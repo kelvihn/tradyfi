@@ -1,5 +1,6 @@
 import {
   pgTable,
+  decimal,
   text,
   varchar,
   timestamp,
@@ -15,6 +16,41 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const traderRates = pgTable("trader_rates", {
+  id: serial("id").primaryKey(),
+  traderId: integer("trader_id").notNull().references(() => traders.id, { onDelete: "cascade" }),
+  currency: varchar("currency").notNull(), // e.g., "USDT", "BTC", "Solana", "Amazon", "iTunes"
+  type: varchar("type", { enum: ["crypto", "giftcard"] }).notNull(),
+  ratePerDollar: decimal("rate_per_dollar", { precision: 15, scale: 8 }).notNull(), // e.g., 2927.75
+  currencySymbol: varchar("currency_symbol", { length: 10 }), // e.g., "ETH", "USD", "NGN"
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Relations for trader rates
+export const traderRatesRelations = relations(traderRates, ({ one }) => ({
+  trader: one(traders, {
+    fields: [traderRates.traderId],
+    references: [traders.id],
+  }),
+}));
+
+// Update your existing tradersRelations to include rates
+// Find your existing tradersRelations and add this line to the many() section:
+// rates: many(traderRates),
+
+// Insert schema for trader rates
+export const insertTraderRateSchema = createInsertSchema(traderRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type TraderRate = typeof traderRates.$inferSelect;
+export type InsertTraderRate = z.infer<typeof insertTraderRateSchema>;
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(

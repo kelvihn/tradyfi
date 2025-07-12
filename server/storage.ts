@@ -7,8 +7,9 @@ import {
   subscriptionPlans,
   userSubscriptions,
   visitorNotifications,
-  type VisitorNotification,
-  type InsertVisitorNotification,
+  traderRates,
+  type TraderRate,
+  type InsertTraderRate,
   type User,
   type UpsertUser,
   type Trader,
@@ -41,6 +42,14 @@ import { db } from "./db";
 import { eq, desc, and, count, sql, or, ne, exists } from "drizzle-orm";
 
 export interface IStorage {
+
+  createTraderRate(rate: InsertTraderRate): Promise<TraderRate>;
+  getTraderRate(id: number): Promise<TraderRate | undefined>;
+  getTraderRates(traderId: number): Promise<TraderRate[]>;
+  getPublicTraderRates(traderId: number): Promise<TraderRate[]>;
+  updateTraderRate(id: number, updates: Partial<InsertTraderRate>): Promise<TraderRate>;
+  deleteTraderRate(id: number): Promise<void>;
+  getTraderRatesByType(traderId: number, type: 'crypto' | 'giftcard'): Promise<TraderRate[]>;
 
   getTraderByEmail(email: string): Promise<TraderWithUser | undefined>;
   checkEmailExists(email: string): Promise<{ exists: boolean; userType: 'trader' | 'user' | null }>;
@@ -216,6 +225,84 @@ export type TraderWithUser = Trader & {
 export class DatabaseStorage implements IStorage {
 
   // Add these methods to your DatabaseStorage class in storage.ts
+
+ // Trader rates operations
+  async createTraderRate(rate: InsertTraderRate): Promise<TraderRate> {
+    const [newRate] = await db
+      .insert(traderRates)
+      .values({
+        ...rate,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return newRate;
+  }
+
+  async getTraderRate(id: number): Promise<TraderRate | undefined> {
+    const [rate] = await db
+      .select()
+      .from(traderRates)
+      .where(eq(traderRates.id, id))
+      .limit(1);
+    return rate;
+  }
+
+  async getTraderRates(traderId: number): Promise<TraderRate[]> {
+    return await db
+      .select()
+      .from(traderRates)
+      .where(and(
+        eq(traderRates.traderId, traderId),
+        eq(traderRates.isActive, true)
+      ))
+      .orderBy(desc(traderRates.updatedAt));
+  }
+
+  async getPublicTraderRates(traderId: number): Promise<TraderRate[]> {
+    return await db
+      .select()
+      .from(traderRates)
+      .where(and(
+        eq(traderRates.traderId, traderId),
+        eq(traderRates.isActive, true)
+      ))
+      .orderBy(traderRates.type, desc(traderRates.updatedAt));
+  }
+
+  async updateTraderRate(id: number, updates: Partial<InsertTraderRate>): Promise<TraderRate> {
+    const [rate] = await db
+      .update(traderRates)
+      .set({ 
+        ...updates, 
+        updatedAt: new Date() 
+      })
+      .where(eq(traderRates.id, id))
+      .returning();
+    return rate;
+  }
+
+  async deleteTraderRate(id: number): Promise<void> {
+    await db
+      .update(traderRates)
+      .set({ 
+        isActive: false,
+        updatedAt: new Date() 
+      })
+      .where(eq(traderRates.id, id));
+  }
+
+  async getTraderRatesByType(traderId: number, type: 'crypto' | 'giftcard'): Promise<TraderRate[]> {
+    return await db
+      .select()
+      .from(traderRates)
+      .where(and(
+        eq(traderRates.traderId, traderId),
+        eq(traderRates.type, type),
+        eq(traderRates.isActive, true)
+      ))
+      .orderBy(desc(traderRates.updatedAt));
+  }
 
 // Get last visitor notification for a user-trader combination
 async getLastVisitorNotification(traderId: number, userId: string): Promise<any> {

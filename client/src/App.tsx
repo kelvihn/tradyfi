@@ -34,6 +34,8 @@ import ResetPassword from "@/pages/reset-password";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import ContactUs from "@/pages/contact-us";
 import DiscoverTraders from "@/pages/discover-trader";
+import TraderRatesManagement from "@/pages/trader/rates-management";
+import PublicTraderRates from "@/pages/trader/public-rates";
 
 // Import chat components
 import { ChatInterface } from "@/components/chat/chat-interface";
@@ -256,6 +258,8 @@ function Router() {
         <Route path="/login" component={UserLogin} />
         <Route path="/register" component={UserRegister} />
 
+        <Route path="/rates" component={() => <PublicTraderRates subdomain={subdomain} />} />
+
         <Route path="/privacy-policy" component={PrivacyPolicy} />
         <Route path="/contact" component={ContactUs} />
         
@@ -328,6 +332,12 @@ function Router() {
       
       {/* Protected trader routes */}
       <Route path="/trader/register" component={TraderRegister} />
+
+      <Route path="/trader/rates">
+        <ProtectedTraderRoute>
+          <TraderRatesManagement />
+        </ProtectedTraderRoute>
+      </Route>
       
       <Route path="/trader/dashboard">
         <ProtectedTraderRoute>
