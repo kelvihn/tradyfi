@@ -159,6 +159,22 @@ export default function TraderRatesManagement() {
     });
   };
 
+  const formatRateDisplay = (rate: TraderRate) => {
+    const rateValue = parseFloat(rate.ratePerDollar);
+    const formattedRate = rateValue.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 8,
+    });
+    
+    if (rate.type === 'crypto') {
+      // For crypto: show "1 ETH = 3,000 USD" (flip the display)
+      return `1 ${rate.currency} = ${formattedRate} ${rate.currencySymbol || 'USD'}`;
+    } else {
+      // For giftcards: keep "1 USD = 1,650 NGN" (original format)
+      return `1 USD = ${formattedRate} ${rate.currencySymbol || 'NGN'}`;
+    }
+  };
+
   const cryptoRates = rates.filter(rate => rate.type === 'crypto');
   const giftcardRates = rates.filter(rate => rate.type === 'giftcard');
 
@@ -325,7 +341,7 @@ export default function TraderRatesManagement() {
                     <div>
                       <div className="font-medium text-lg">{rate.currency}</div>
                       <div className="text-sm text-slate-600">
-                        <strong>1 USD = {parseFloat(rate.ratePerDollar).toLocaleString()} {rate.currencySymbol || rate.currency}</strong>
+                        <strong>{formatRateDisplay(rate)}</strong>
                       </div>
                       <div className="text-xs text-slate-500">
                         <strong>Updated: {new Date(rate.updatedAt).toLocaleString()}</strong>
@@ -372,7 +388,7 @@ export default function TraderRatesManagement() {
                     <div>
                       <div className="font-medium text-lg">{rate.currency}</div>
                       <div className="text-sm text-slate-600">
-                        <strong>1 USD = {parseFloat(rate.ratePerDollar).toLocaleString()} {rate.currencySymbol || 'NGN'}</strong>
+                        <strong>{formatRateDisplay(rate)}</strong>
                       </div>
                       <div className="text-xs text-slate-500">
                         <strong>Updated: {new Date(rate.updatedAt).toLocaleString()}</strong>
