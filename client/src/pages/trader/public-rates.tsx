@@ -139,17 +139,17 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
       {/* Header */}
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 space-y-3 sm:space-y-0">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                 <TrendingUp className="text-white h-5 w-5" />
               </div>
               <div className="ml-3">
-                <div className="text-xl font-bold text-slate-900">{trader.businessName}</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-900">{trader.businessName}</div>
                 <div className="text-xs text-slate-600">Current Trading Rates</div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
               {lastUpdated && (
                 <div className="flex items-center space-x-2 text-sm text-slate-600">
                   <Clock className="h-4 w-4" />
@@ -158,7 +158,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
               )}
               <Button 
                 onClick={() => window.location.href = `/`}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Start Trading
@@ -170,18 +170,18 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3 sm:mb-4">
             Current Trading Rates
           </h1>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto px-2">
             View our real-time exchange rates for cryptocurrencies and gift cards. 
             All rates are updated regularly to reflect current market conditions.
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Rates</CardTitle>
@@ -234,25 +234,25 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Cryptocurrency Rates */}
             {rates.crypto.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-lg sm:text-xl">
                     <DollarSign className="h-5 w-5 mr-2 text-green-600" />
                     Cryptocurrency Rates
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {rates.crypto.map((rate) => {
                       const { formattedRate, symbol } = formatRate(rate);
                       return (
-                        <div key={rate.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold text-lg">{rate.currency}</div>
-                            <Badge className="bg-green-100 text-green-800">
+                        <div key={rate.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-1 sm:space-y-0">
+                            <div className="font-semibold text-base sm:text-lg">{rate.currency}</div>
+                            <Badge className="bg-green-100 text-green-800 w-fit">
                               Crypto
                             </Badge>
                           </div>
@@ -274,20 +274,20 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
             {rates.giftcard.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-lg sm:text-xl">
                     <DollarSign className="h-5 w-5 mr-2 text-blue-600" />
                     Gift Card Rates
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {rates.giftcard.map((rate) => {
                       const { formattedRate, symbol } = formatRate(rate);
                       return (
-                        <div key={rate.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-semibold text-lg">{rate.currency}</div>
-                            <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                        <div key={rate.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-1 sm:space-y-0">
+                            <div className="font-semibold text-base sm:text-lg">{rate.currency}</div>
+                            <Badge variant="outline" className="bg-blue-100 text-blue-800 w-fit">
                               Gift Card
                             </Badge>
                           </div>
@@ -308,18 +308,18 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
         )}
 
         {/* Call to Action */}
-        <Card className="mt-8">
+        <Card className="mt-6 sm:mt-8">
           <CardContent className="pt-6 text-center">
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
               Ready to Trade?
             </h3>
-            <p className="text-slate-600 mb-4">
+            <p className="text-slate-600 mb-4 text-sm sm:text-base">
               Contact {trader.businessName} to start your transaction with these current rates.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <Button 
                 onClick={() => window.location.href = `/`}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Start Trading
@@ -327,7 +327,7 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
               <Button 
                 variant="outline"
                 onClick={() => window.location.href = `https://${trader.subdomain}.tradyfi.ng`}
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                className="border-blue-600 text-blue-600 hover:bg-blue-50 w-full sm:w-auto"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Visit Trader Portal
@@ -337,9 +337,9 @@ export default function PublicTraderRates({ subdomain }: PublicTraderRatesProps)
         </Card>
 
         {/* Disclaimer */}
-        <div className="mt-8 text-center">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">
+        <div className="mt-6 sm:mt-8 text-center">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-yellow-800">
               <strong>Disclaimer:</strong> Rates are subject to change and may vary based on transaction amount, 
               market conditions, and other factors. Please confirm current rates with the trader before proceeding 
               with any transaction.
