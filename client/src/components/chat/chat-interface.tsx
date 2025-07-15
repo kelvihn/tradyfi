@@ -36,7 +36,7 @@ const linkifyText = (text: string) => {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300 underline break-all"
+          className="text-blue-400 hover:text-blue-300 underline break-all word-break-all"
           onClick={(e) => {
             e.stopPropagation();
             window.open(href, '_blank', 'noopener,noreferrer');
@@ -624,7 +624,7 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
             className={`flex ${message.senderId === userId ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative ${
+              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative break-words ${
                 message.senderId === userId
                   ? `bg-primary text-white ${message.hasError ? 'bg-red-500' : ''} ${message.isSending ? 'opacity-70' : ''}`
                   : 'bg-white border border-slate-200'
@@ -648,9 +648,9 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
                 </p>
               )}
               
-              {/* Updated message content rendering with clickable links */}
+              {/* Updated message content rendering with clickable links and better word breaking */}
               {message.content && (
-                <div className="text-sm">
+                <div className="text-sm break-words overflow-wrap-anywhere">
                   {linkifyText(message.content)}
                 </div>
               )}
