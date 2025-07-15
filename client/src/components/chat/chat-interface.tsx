@@ -1,4 +1,4 @@
-// Updated chat-interface.tsx with Firebase FCM
+// Updated chat-interface.tsx with Firebase FCM and Clickable Links
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,44 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { useFirebaseMessaging } from "@/hooks/useFirebaseMessaging"; 
 import { getSubdomain } from "@/lib/subdomain";
 import { useToast } from "@/hooks/use-toast";
+
+// Linkify utility function for making links clickable
+const linkifyText = (text: string) => {
+  // Enhanced regex that matches various URL formats
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/g;
+  
+  const parts = text.split(urlRegex);
+  
+  return parts.map((part, index) => {
+    if (!part) return part;
+    
+    // Check if this part matches a URL pattern
+    if (urlRegex.test(part)) {
+      // Add https:// if URL doesn't have protocol
+      let href = part;
+      if (!part.startsWith('http://') && !part.startsWith('https://')) {
+        href = `https://${part}`;
+      }
+      
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:text-blue-300 underline break-all"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(href, '_blank', 'noopener,noreferrer');
+          }}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
 
 interface Message {
   id: number;
@@ -204,9 +242,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
-  // ... rest of your existing methods remain the same ...
-  // (loadMessages, scrollToBottom, sendMessage, etc.)
-
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -359,8 +394,6 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
     }
   };
 
-  // ... rest of your existing methods (renderAttachments, handleInputChange, etc.) ...
-  
   const renderAttachments = (attachments: Message['attachments']) => {
     if (!attachments || attachments.length === 0) return null;
 
@@ -615,7 +648,12 @@ export function ChatInterface({ roomId, userId, tradingOption = "Chat", onBack }
                 </p>
               )}
               
-              {message.content && <p className="text-sm">{message.content}</p>}
+              {/* Updated message content rendering with clickable links */}
+              {message.content && (
+                <div className="text-sm">
+                  {linkifyText(message.content)}
+                </div>
+              )}
               
               {renderAttachments(message.attachments)}
               
