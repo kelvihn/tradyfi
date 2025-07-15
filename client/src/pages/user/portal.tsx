@@ -237,34 +237,47 @@ export default function UserPortal({ subdomain }: UserPortalProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <ChartLine className="text-white text-lg" />
-              </div>
-              <div className="ml-3">
-                <h1 className="text-xl font-bold text-slate-900">{trader?.businessName || 'Trading Portal'}</h1>
-                <p className="text-sm text-slate-500">Crypto Trading Portal</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-600">
-                Welcome, {user?.firstName}
-              </span>
-              <Badge variant="default" className="bg-green-500">
-                <Shield className="h-3 w-3 mr-1" />
-                Verified Trader
-              </Badge>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
+     <header className="bg-white border-b border-slate-200">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between items-center py-3 sm:py-4">
+      <div className="flex items-center min-w-0 flex-1">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+          <ChartLine className="text-white text-sm sm:text-lg" />
         </div>
-      </header>
+        <div className="ml-2 sm:ml-3 min-w-0 flex-1">
+          <h1 className="text-sm sm:text-xl font-bold text-slate-900 truncate">
+            {trader?.businessName || 'Trading Portal'}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">
+            Crypto Trading Portal
+          </p>
+        </div>
+      </div>
+      
+      <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+        {/* Welcome text - hidden on mobile */}
+        <span className="text-sm text-slate-600 hidden md:block">
+          Welcome, {user?.firstName}
+        </span>
+        
+        {/* Badge - simplified on mobile */}
+        <Badge variant="default" className="bg-green-500 hidden sm:flex">
+          <Shield className="h-3 w-3 mr-1" />
+          Verified Trader
+        </Badge>
+        <Badge variant="default" className="bg-green-500 sm:hidden px-2 py-1">
+          <Shield className="h-3 w-3" />
+        </Badge>
+        
+        {/* Logout button - simplified on mobile */}
+        <Button variant="outline" onClick={handleLogout} className="px-2 sm:px-4">
+          <LogOut className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Logout</span>
+        </Button>
+      </div>
+    </div>
+  </div>
+</header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
